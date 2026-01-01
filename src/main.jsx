@@ -1,37 +1,29 @@
 import React from 'react'
 import ReactDOM from 'react-dom/client'
 import App from './App.jsx'
-import { createAppKit } from '@reown/appkit/react'
-import { SolanaAdapter } from '@reown/appkit-adapter-solana/react'
-import { solana, solanaDevnet, solanaTestnet } from '@reown/appkit/networks'
+import { ConnectionProvider, WalletProvider } from '@solana/wallet-adapter-react'
+import { WalletModalProvider } from '@solana/wallet-adapter-react-ui'
+import { PhantomWalletAdapter, SolflareWalletAdapter } from '@solana/wallet-adapter-wallets'
+import { clusterApiUrl } from '@solana/web3.js'
 
-// YOUR REOWN PROJECT ID
-const projectId = '1f1ea64e0b931eecba61513d1868ae02'
+import '@solana/wallet-adapter-react-ui/styles.css' // Pro modal styles
 
-const metadata = {
-  name: 'Solana Mini App',
-  description: 'Connect wallet for bot automation',
-  url: 'https://your-vercel-url.vercel.app',
-  icons: ['https://avatars.githubusercontent.com/u/179229932']
-}
+const wallets = [
+  new PhantomWalletAdapter(),
+  new SolflareWalletAdapter(),
+  // Add more if needed (Backpack, OKX, etc.)
+]
 
-const solanaAdapter = new SolanaAdapter()
-
-createAppKit({
-  adapters: [solanaAdapter],
-  networks: [solana, solanaDevnet, solanaTestnet],
-  projectId,
-  metadata,
-  features: {
-    allWallets: true,
-    analytics: true,
-    connectMethodsOrder: ['wallet'],  // Still only wallets in list
-    showQrModal: true  // KEY: Forces QR fallback for browser testing (scan with Phantom app)
-  }
-})
+const endpoint = clusterApiUrl('mainnet-beta') // Or devnet for testing
 
 ReactDOM.createRoot(document.getElementById('root')).render(
   <React.StrictMode>
-    <App />
+    <ConnectionProvider endpoint={endpoint}>
+      <WalletProvider wallets={wallets} autoConnect>
+        <WalletModalProvider>
+          <App />
+        </WalletModalProvider>
+      </WalletProvider>
+    </ConnectionProvider>
   </React.StrictMode>
 )
