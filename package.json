@@ -1,5 +1,5 @@
 {
-  "name": "solana-mini-app",
+  "name": "solana-deposit-miniapp",
   "private": true,
   "version": "0.0.1",
   "type": "module",
@@ -9,10 +9,10 @@
     "preview": "vite preview"
   },
   "dependencies": {
-    "@solana/wallet-adapter-base": "^0.9.23",
-    "@solana/wallet-adapter-react": "^0.15.35",
-    "@solana/wallet-adapter-react-ui": "^0.9.35",
-    "@solana/wallet-adapter-wallets": "^0.19.32",
+    "@reown/appkit": "^1.8.15",
+    "@reown/appkit-adapter-solana": "^1.8.15",
+    "@reown/appkit-react": "^1.8.15",
+    "@reown/appkit/networks": "^1.8.15",
     "@solana/web3.js": "^1.95.3",
     "react": "^18.3.1",
     "react-dom": "^18.3.1"
