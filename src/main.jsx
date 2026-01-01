@@ -6,7 +6,7 @@ import { SolanaAdapter } from '@reown/appkit-adapter-solana/react'
 import { solana, solanaDevnet } from '@reown/appkit/networks' // Works from main package
 
 // YOUR REAL PROJECT ID FROM cloud.reown.com
-const projectId = 'YOUR_REOWN_PROJECT_ID_HERE'
+const projectId = '1f1ea64e0b931eecba61513d1868ae02'
 
 const metadata = {
   name: 'Free Fire SOL Deposit',
