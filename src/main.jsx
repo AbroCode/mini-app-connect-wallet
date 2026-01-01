@@ -3,16 +3,16 @@ import ReactDOM from 'react-dom/client'
 import App from './App.jsx'
 import { createAppKit } from '@reown/appkit/react'
 import { SolanaAdapter } from '@reown/appkit-adapter-solana/react'
-import { solana, solanaDevnet } from '@reown/appkit/networks'
+import { solana, solanaDevnet } from '@reown/appkit/networks' // Works from main package
 
-// YOUR REAL PROJECT ID FROM cloud.reown.com (mandatory for full wallet list!)
+// YOUR REAL PROJECT ID FROM cloud.reown.com
 const projectId = 'YOUR_REOWN_PROJECT_ID_HERE'
 
 const metadata = {
   name: 'Free Fire SOL Deposit',
   description: 'Deposit SOL for diamonds/topup/mods',
   url: 'https://your-vercel.app',
-  icons: ['https://your-icon.png']
+  icons: ['https://avatars.githubusercontent.com/u/179229932']
 }
 
 const solanaAdapter = new SolanaAdapter()
@@ -23,9 +23,8 @@ createAppKit({
   projectId,
   metadata,
   features: {
-    allWallets: true, // FULL 500+ LIST INCLUDING 100+ SOLANA
-    analytics: true,
-    connectMethodsOrder: ['wallet'] // Only wallets, no email/social
+    allWallets: true, // 500+ wallets grid
+    connectMethodsOrder: ['wallet']
   }
 })
 
