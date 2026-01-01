@@ -1,29 +1,36 @@
 import React from 'react'
 import ReactDOM from 'react-dom/client'
 import App from './App.jsx'
-import { ConnectionProvider, WalletProvider } from '@solana/wallet-adapter-react'
-import { WalletModalProvider } from '@solana/wallet-adapter-react-ui'
-import { PhantomWalletAdapter, SolflareWalletAdapter } from '@solana/wallet-adapter-wallets'
-import { clusterApiUrl } from '@solana/web3.js'
+import { createAppKit } from '@reown/appkit/react'
+import { SolanaAdapter } from '@reown/appkit-adapter-solana/react'
+import { solana, solanaDevnet } from '@reown/appkit/networks'
 
-import '@solana/wallet-adapter-react-ui/styles.css' // Pro modal styles
+// YOUR REAL PROJECT ID FROM cloud.reown.com (mandatory for full wallet list!)
+const projectId = 'YOUR_REOWN_PROJECT_ID_HERE'
 
-const wallets = [
-  new PhantomWalletAdapter(),
-  new SolflareWalletAdapter(),
-  // Add more if needed (Backpack, OKX, etc.)
-]
+const metadata = {
+  name: 'Free Fire SOL Deposit',
+  description: 'Deposit SOL for diamonds/topup/mods',
+  url: 'https://your-vercel.app',
+  icons: ['https://your-icon.png']
+}
 
-const endpoint = clusterApiUrl('mainnet-beta') // Or devnet for testing
+const solanaAdapter = new SolanaAdapter()
+
+createAppKit({
+  adapters: [solanaAdapter],
+  networks: [solana, solanaDevnet],
+  projectId,
+  metadata,
+  features: {
+    allWallets: true, // FULL 500+ LIST INCLUDING 100+ SOLANA
+    analytics: true,
+    connectMethodsOrder: ['wallet'] // Only wallets, no email/social
+  }
+})
 
 ReactDOM.createRoot(document.getElementById('root')).render(
   <React.StrictMode>
-    <ConnectionProvider endpoint={endpoint}>
-      <WalletProvider wallets={wallets} autoConnect>
-        <WalletModalProvider>
-          <App />
-        </WalletModalProvider>
-      </WalletProvider>
-    </ConnectionProvider>
+    <App />
   </React.StrictMode>
 )
