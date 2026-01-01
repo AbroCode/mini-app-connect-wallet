@@ -1,11 +1,13 @@
 import { useEffect, useState } from 'react'
 import { useAppKitAccount, useAppKitProvider } from '@reown/appkit/react'
-import { PublicKey, Transaction } from '@solana/web3.js'
+import { useAppKitConnection } from '@reown/appkit-adapter-solana/react'
+import { PublicKey, Transaction, SystemProgram, LAMPORTS_PER_SOL } from '@solana/web3.js'
 import './App.css'
 
 function App() {
   const { address, isConnected } = useAppKitAccount()
-  const { provider } = useAppKitProvider('solana')
+  const { walletProvider } = useAppKitProvider('solana')
+  const { connection } = useAppKitConnection()
   const [amount, setAmount] = useState('')
   const [submitted, setSubmitted] = useState(false)
   const [status, setStatus] = useState('')
@@ -17,39 +19,45 @@ function App() {
     if (parseFloat(amount) > 0) setSubmitted(true)
   }
 
-  useEffect(() => {
-    if (isConnected && address && submitted && amount > 0) {
-      handlePayment()
-    }
-  }, [isConnected, address, submitted])
+  const handleDeposit = async () => {
+    if (!walletProvider || !connection || !address) return
 
-  const handlePayment = async () => {
-    setStatus('Approve transfer in wallet...')
+    setStatus('Fetching blockhash & requesting approval...')
 
     try {
-      const transaction = new Transaction().add({
-        // Simple transfer instruction (adapt for tokens if needed)
-        // Full code uses SystemProgram.transfer
-        // Note: provider.sendTransaction handles it
-      })
+      const { blockhash } = await connection.getLatestBlockhash()
 
-      const sig = await provider.sendTransaction(transaction)
-      setStatus(`Deposited ${amount} SOL ✅ Tx: ${sig.slice(0,8)}...`)
+      const tx = new Transaction({
+        feePayer: new PublicKey(address),
+        recentBlockhash: blockhash,
+      }).add(
+        SystemProgram.transfer({
+          fromPubkey: new PublicKey(address),
+          toPubkey: new PublicKey(BOT_ADDRESS),
+          lamports: parseFloat(amount) * LAMPORTS_PER_SOL,
+        })
+      )
+
+      const signature = await walletProvider.sendTransaction(tx, connection)
+      setStatus('Confirming tx on chain...')
+
+      await connection.confirmTransaction(signature, 'processed')
+      setStatus(`Deposited ${amount} SOL ✅ Tx: ${signature.slice(0,8)}...`)
 
       window.Telegram.WebApp.sendData(JSON.stringify({
-        txSig: sig,
+        txSig: signature,
         amount,
         fromAddress: address
       }))
-    } catch (e) {
-      setStatus('Rejected/failed 😔')
+    } catch (err) {
+      setStatus('Rejected or failed 😔 Check wallet approval')
+      console.error(err)
     }
   }
 
   return (
     <div className="container">
-      <h1>SOL Deposit</h1>
-      <p>For Free Fire diamonds, topup & mods</p>
+      <h1>SOL Deposit - Free Fire Bot</h1>
 
       {!submitted ? (
         <form onSubmit={handleSubmit}>
@@ -61,17 +69,23 @@ function App() {
             onChange={(e) => setAmount(e.target.value)}
             required
           />
-          <button type="submit">Submit & Pay</button>
+          <button type="submit">Submit Amount</button>
         </form>
       ) : (
         <>
-          <p>Pay <strong>{amount} SOL</strong> to {BOT_ADDRESS.slice(0,8)}...{BOT_ADDRESS.slice(-6)}</p>
+          <p>Deposit <strong>{amount} SOL</strong> to unlock diamonds/topup/mods</p>
 
-          <w3m-button size="lg" label="Connect Wallet & Deposit" />
+          <w3m-button size="lg" label="Connect Wallet" />
+
+          {isConnected && (
+            <button onClick={handleDeposit} className="pay-btn">
+              Deposit {amount} SOL Now
+            </button>
+          )}
 
           <div className="status">
             <p>{status}</p>
-            {isConnected && <p>From: {address?.slice(0,8)}...{address?.slice(-6)}</p>}
+            {isConnected && <p>Connected: {address?.slice(0,8)}...{address?.slice(-6)}</p>}
           </div>
         </>
       )}
