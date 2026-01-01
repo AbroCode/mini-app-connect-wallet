@@ -1,91 +1,88 @@
 import { useEffect, useState } from 'react'
 import { useWallet, useConnection } from '@solana/wallet-adapter-react'
-import { WalletMultiButton } from '@solana/wallet-adapter-react-ui'
+import { WalletModalButton } from '@solana/wallet-adapter-react-ui' // Better: Always "Select Wallet" button
 import { Transaction, SystemProgram, PublicKey, LAMPORTS_PER_SOL } from '@solana/web3.js'
 import './App.css'
 
 function App() {
-  const { publicKey, connected, sendTransaction } = useWallet()
+  const { publicKey, connected, sendTransaction, connecting } = useWallet()
   const { connection } = useConnection()
-  const [sent, setSent] = useState(false)
-  const [txStatus, setTxStatus] = useState('')
+  const [amount, setAmount] = useState(null)
+  const [tgId, setTgId] = useState(null)
+  const [status, setStatus] = useState('')
 
-  // Bot's receive address (your hot wallet — keep secure!)
-  const BOT_ADDRESS = new PublicKey('YOUR_BOT_SOLANA_ADDRESS_HERE') // Replace with real
+  // TEST BOT RECEIVE ADDRESS — replace with your real one later
+  const BOT_ADDRESS = new PublicKey('YOUR_TEST_BOT_SOL_ADDRESS_HERE') // e.g., a devnet wallet for testing
 
+  // Parse amount & tg_id from URL (bot launches with ?amount=0.05&tg_id=123)
   useEffect(() => {
-    if (connected && publicKey && !sent) {
-      const address = publicKey.toBase58()
-      const data = { walletAddress: address, chain: 'solana' }
-      window.Telegram.WebApp.sendData(JSON.stringify(data))
-      setSent(true)
-      window.Telegram.WebApp.expand()
-    }
-  }, [connected, publicKey, sent])
+    const params = new URLSearchParams(window.location.search)
+    const amt = parseFloat(params.get('amount'))
+    const id = params.get('tg_id')
+    if (amt > 0) setAmount(amt)
+    if (id) setTgId(id)
+  }, [])
 
-  const handlePayment = async (amountSOL) => {
-    if (!connected || !publicKey) {
-      setTxStatus('Connect wallet first bro!')
-      return
+  // Auto request payment RIGHT AFTER connect
+  useEffect(() => {
+    if (connected && publicKey && amount && !status.includes('Paid')) {
+      handlePayment()
     }
+  }, [connected, publicKey, amount])
+
+  const handlePayment = async () => {
+    if (!publicKey || !amount) return
+
+    setStatus('Requesting payment approval in wallet...')
 
     try {
-      setTxStatus('Requesting approval in Phantom...')
-
       const tx = new Transaction().add(
         SystemProgram.transfer({
           fromPubkey: publicKey,
           toPubkey: BOT_ADDRESS,
-          lamports: amountSOL * LAMPORTS_PER_SOL,
+          lamports: amount * LAMPORTS_PER_SOL,
         })
       )
 
       const signature = await sendTransaction(tx, connection)
-      setTxStatus('Confirming tx...')
+      setStatus('Confirming transaction...')
 
       await connection.confirmTransaction(signature, 'processed')
-      setTxStatus(`Paid ✅ Tx: ${signature.slice(0, 8)}...`)
+      setStatus(`Paid ${amount} SOL ✅ Tx: ${signature.slice(0,8)}...`)
 
-      // Send tx proof to bot for instant credit (diamonds/topup mod)
-      window.Telegram.WebApp.sendData(JSON.stringify({
+      // Send proof to bot for instant credit (diamonds/topup/mod unlock)
+      const data = {
         paymentTx: signature,
-        amount: amountSOL,
+        amount: amount,
+        tgId: tgId || window.Telegram.WebApp.initDataUnsafe.user?.id,
         walletAddress: publicKey.toBase58()
-      }))
-    } catch (error) {
-      setTxStatus('Rejected or failed 😔')
-      console.error(error)
+      }
+      window.Telegram.WebApp.sendData(JSON.stringify(data))
+    } catch (err) {
+      setStatus('Payment rejected or failed 😔')
+      console.error(err)
     }
   }
 
   return (
     <div className="container">
-      <h1>Free Fire Premium Bot</h1>
-      <p>Connect & Pay for Diamonds/Topup/Mods</p>
+      <h1>Free Fire Payment</h1>
 
-      <WalletMultiButton style={{ margin: '20px auto', display: 'block' }} />
-
-      {connected && publicKey ? (
-        <div className="connected">
-          <p>Wallet: {publicKey.toBase58().slice(0, 8)}...{publicKey.toBase58().slice(-6)}</p>
-          <p>Ready for payment automation</p>
-
-          {/* Example payments — mod prices for your Free Fire features */}
-          <button onClick={() => handlePayment(0.05)} className="pay-btn">
-            Pay 0.05 SOL → 500 Diamonds
-          </button>
-          <button onClick={() => handlePayment(0.1)} className="pay-btn">
-            Pay 0.1 SOL → Unlimited Ammo Mod
-          </button>
-          <button onClick={() => handlePayment(0.2)} className="pay-btn">
-            Pay 0.2 SOL → Full Topup Pack
-          </button>
-
-          <p>{txStatus}</p>
-        </div>
+      {amount ? (
+        <p>Pay <strong>{amount} SOL</strong> to unlock premium pack</p>
       ) : (
-        <p>Connect Phantom to pay & unlock mods</p>
+        <p>No amount specified — launch from bot with ?amount=0.05</p>
       )}
+
+      {/* Always shows wallet list modal — no "Connect" text confusion */}
+      <WalletModalButton style={{ width: '100%', padding: '20px', fontSize: '20px' }}>
+        {connecting ? 'Connecting...' : 'Select Wallet & Pay'}
+      </WalletModalButton>
+
+      <div className="status">
+        <p>{status}</p>
+        {connected && <p>Wallet: {publicKey.toBase58().slice(0,8)}...{publicKey.toBase58().slice(-6)}</p>}
+      </div>
     </div>
   )
 }
