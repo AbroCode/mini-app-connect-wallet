@@ -1,11 +1,17 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
+import { useWallet, useConnection } from '@solana/wallet-adapter-react'
+import { WalletModalButton } from '@solana/wallet-adapter-react-ui'
+import { Transaction, SystemProgram, PublicKey, LAMPORTS_PER_SOL } from '@solana/web3.js'
 import './App.css'
 
 function App() {
+  const { publicKey, connected, sendTransaction } = useWallet()
+  const { connection } = useConnection()
   const [amount, setAmount] = useState('')
   const [submitted, setSubmitted] = useState(false)
+  const [status, setStatus] = useState('')
 
-  const BOT_ADDRESS = '8vrwajVezWhxt4M1wyyPRuFzYDV3LBkw2y2nGkiSZU71'
+  const BOT_ADDRESS = new PublicKey('8vrwajVezWhxt4M1wyyPRuFzYDV3LBkw2y2nGkiSZU71')
 
   const handleSubmit = (e) => {
     e.preventDefault()
@@ -13,42 +19,51 @@ function App() {
     if (amt > 0) setSubmitted(true)
   }
 
-  // Phantom deep link for connect + transfer (coordinated, no reload)
-  const phantomDeepLink = () => {
-    const params = new URLSearchParams({
-      app_url: window.location.origin,
-      redirect_link: window.location.href, // Return to same page with state
-      cluster: 'mainnet-beta',
-      amount: (parseFloat(amount) * 1e9).toString(), // lamports
-      to: BOT_ADDRESS,
-      // Add reference or memo if needed for bot verify
-    })
-    const link = `https://phantom.app/ul/v1/transfer?${params.toString()}`
-    window.location.href = link // Opens Phantom, approves → return seamless
+  useEffect(() => {
+    if (connected && publicKey && submitted && amount) {
+      handlePay()
+    }
+  }, [connected, publicKey, submitted])
+
+  const handlePay = async () => {
+    setStatus('Approve in wallet...')
+    try {
+      const { blockhash } = await connection.getLatestBlockhash()
+      const tx = new Transaction({
+        recentBlockhash: blockhash,
+        feePayer: publicKey,
+      }).add(
+        SystemProgram.transfer({
+          fromPubkey: publicKey,
+          toPubkey: BOT_ADDRESS,
+          lamports: parseFloat(amount) * LAMPORTS_PER_SOL,
+        })
+      )
+
+      const sig = await sendTransaction(tx, connection)
+      await connection.confirmTransaction(sig)
+      setStatus(`Paid ${amount} SOL ✅ Tx: ${sig.slice(0,8)}...`)
+
+      window.Telegram.WebApp.sendData(JSON.stringify({ txSig: sig, amount, from: publicKey.toBase58() }))
+    } catch (e) {
+      setStatus('Rejected 😔')
+    }
   }
 
   return (
     <div className="container">
-      <h1>Free Fire SOL Deposit</h1>
+      <h1>Free Fire Deposit</h1>
 
       {!submitted ? (
         <form onSubmit={handleSubmit}>
-          <input type="number" step="0.01" placeholder="Enter SOL amount" value={amount} onChange={e => setAmount(e.target.value)} required />
-          <button type="submit">Submit Amount</button>
+          <input type="number" step="0.01" placeholder="SOL Amount" value={amount} onChange={e => setAmount(e.target.value)} required />
+          <button type="submit">Submit & Pay</button>
         </form>
       ) : (
         <>
-          <p>Deposit <strong>{amount} SOL</strong> for diamonds/topup/mods</p>
-
-          {/* Pro Phantom button - deep link, coordinated flow */}
-          <button onClick={phantomDeepLink} className="phantom-btn">
-            Pay with Phantom (Recommended)
-          </button>
-
-          {/* Fallback for other wallets */}
-          <w3m-button size="lg" label="Other Wallets (100+)" />
-
-          <p>To: {BOT_ADDRESS.slice(0,8)}...{BOT_ADDRESS.slice(-6)}</p>
+          <p>Pay <strong>{amount} SOL</strong></p>
+          <WalletModalButton>Select Wallet</WalletModalButton>
+          <div className="status"><p>{status}</p></div>
         </>
       )}
     </div>
