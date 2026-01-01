@@ -1,28 +1,79 @@
-import { useEffect, useState } from 'react'
-import { useAppKitAccount, useAppKitProvider } from '@reown/appkit/react'
-import { useAppKitConnection } from '@reown/appkit-adapter-solana/react'
-import { PublicKey, Transaction, SystemProgram, LAMPORTS_PER_SOL } from '@solana/web3.js'
-import './App.css'
+"use client"
+
+import { useEffect, useState } from "react"
+import { useAppKitAccount, useAppKitProvider } from "@reown/appkit/react"
+import { useAppKitConnection } from "@reown/appkit-adapter-solana/react"
+import { PublicKey, Transaction, SystemProgram, LAMPORTS_PER_SOL } from "@solana/web3.js"
+import "./App.css"
 
 function App() {
   const { address, isConnected } = useAppKitAccount()
-  const { walletProvider } = useAppKitProvider('solana')
+  const { walletProvider } = useAppKitProvider("solana")
   const { connection } = useAppKitConnection()
-  const [amount, setAmount] = useState('')
-  const [submitted, setSubmitted] = useState(false)
-  const [status, setStatus] = useState('')
 
-  const BOT_ADDRESS = '8vrwajVezWhxt4M1wyyPRuFzYDV3LBkw2y2nGkiSZU71' // Your receive
+  const [amount, setAmount] = useState(() => {
+    const params = new URLSearchParams(window.location.search)
+    return params.get("amount") || ""
+  })
+  const [status, setStatus] = useState("")
+  const [loading, setLoading] = useState(false)
 
-  const handleSubmit = (e) => {
-    e.preventDefault()
-    if (parseFloat(amount) > 0) setSubmitted(true)
-  }
+  const BOT_ADDRESS = "8vrwajVezWhxt4M1wyyPRuFzYDV3LBkw2y2nGkiSZU71"
+
+  useEffect(() => {
+    const tg = window.Telegram?.WebApp
+    if (tg) {
+      tg.ready()
+      tg.expand()
+      tg.enableClosingConfirmation()
+
+      // Set header color to match app theme
+      tg.setHeaderColor("#0a0e27")
+      tg.setBackgroundColor("#0a0e27")
+    }
+  }, [])
+
+  useEffect(() => {
+    const tg = window.Telegram?.WebApp
+    if (!tg) return
+
+    const canDeposit = isConnected && amount && Number.parseFloat(amount) > 0 && !loading
+
+    if (canDeposit) {
+      tg.MainButton.setText(`Deposit ${amount} SOL`)
+      tg.MainButton.color = "#00d4ff"
+      tg.MainButton.textColor = "#0a0e27"
+      tg.MainButton.show()
+      tg.MainButton.enable()
+
+      // Set up click handler
+      tg.MainButton.onClick(handleDeposit)
+    } else {
+      tg.MainButton.hide()
+    }
+
+    // Cleanup
+    return () => {
+      tg.MainButton.offClick(handleDeposit)
+    }
+  }, [isConnected, amount, loading])
 
   const handleDeposit = async () => {
-    if (!walletProvider || !connection || !address) return
+    if (!walletProvider || !connection || !address || !amount) return
 
-    setStatus('Fetching blockhash & requesting approval...')
+    const tg = window.Telegram?.WebApp
+
+    setLoading(true)
+    setStatus("Preparing transaction...")
+
+    tg?.HapticFeedback?.impactOccurred("medium")
+
+    // Update MainButton to show progress
+    if (tg) {
+      tg.MainButton.showProgress(false)
+      tg.MainButton.setText("Processing...")
+      tg.MainButton.disable()
+    }
 
     try {
       const { blockhash } = await connection.getLatestBlockhash()
@@ -34,60 +85,120 @@ function App() {
         SystemProgram.transfer({
           fromPubkey: new PublicKey(address),
           toPubkey: new PublicKey(BOT_ADDRESS),
-          lamports: parseFloat(amount) * LAMPORTS_PER_SOL,
-        })
+          lamports: Number.parseFloat(amount) * LAMPORTS_PER_SOL,
+        }),
       )
 
       const signature = await walletProvider.sendTransaction(tx, connection)
-      setStatus('Confirming tx on chain...')
+      setStatus("Confirming on blockchain...")
+      tg?.HapticFeedback?.impactOccurred("light")
 
-      await connection.confirmTransaction(signature, 'processed')
-      setStatus(`Deposited ${amount} SOL ✅ Tx: ${signature.slice(0,8)}...`)
+      await connection.confirmTransaction(signature, "processed")
 
-      window.Telegram.WebApp.sendData(JSON.stringify({
-        txSig: signature,
-        amount,
-        fromAddress: address
-      }))
+      setStatus(`Transaction confirmed! 🎉`)
+      tg?.HapticFeedback?.notificationOccurred("success")
+
+      if (tg) {
+        tg.MainButton.hideProgress()
+        tg.MainButton.setText("✅ Success!")
+      }
+
+      // Send data to bot
+      tg?.sendData(
+        JSON.stringify({
+          txSig: signature,
+          amount,
+          fromAddress: address,
+        }),
+      )
+
+      // Close app after success
+      setTimeout(() => {
+        tg?.close()
+      }, 2000)
     } catch (err) {
-      setStatus('Rejected or failed 😔 Check wallet approval')
+      setStatus("Transaction failed. Please try again.")
+      tg?.HapticFeedback?.notificationOccurred("error")
+
+      if (tg) {
+        tg.MainButton.hideProgress()
+        tg.MainButton.setText("Try Again")
+        tg.MainButton.enable()
+      }
+
       console.error(err)
+
+      // Auto-hide error message after 5 seconds
+      setTimeout(() => {
+        setStatus("")
+      }, 5000)
+    } finally {
+      setLoading(false)
     }
   }
 
+  const handleAmountChange = (e) => {
+    setAmount(e.target.value)
+    if (e.target.value && Number.parseFloat(e.target.value) > 0) {
+      window.Telegram?.WebApp?.HapticFeedback?.selectionChanged()
+    }
+  }
+
+  useEffect(() => {
+    const url = new URL(window.location.href)
+    if (amount) {
+      url.searchParams.set("amount", amount)
+    } else {
+      url.searchParams.delete("amount")
+    }
+    window.history.replaceState({}, "", url.toString())
+  }, [amount])
+
   return (
     <div className="container">
-      <h1>SOL Deposit - Free Fire Bot</h1>
+      <header className="header">
+        <h1>SOL Deposit</h1>
+        <p className="subtitle">Free Fire Topup Bot</p>
+      </header>
 
-      {!submitted ? (
-        <form onSubmit={handleSubmit}>
+      <div className="card">
+        <div className="input-group">
+          <label htmlFor="amount">Amount (SOL)</label>
           <input
+            id="amount"
             type="number"
             step="0.01"
-            placeholder="Enter SOL amount"
+            placeholder="0.00"
             value={amount}
-            onChange={(e) => setAmount(e.target.value)}
-            required
+            onChange={handleAmountChange}
+            disabled={loading}
           />
-          <button type="submit">Submit Amount</button>
-        </form>
-      ) : (
-        <>
-          <p>Deposit <strong>{amount} SOL</strong> to unlock diamonds/topup/mods</p>
+        </div>
 
-          <w3m-button size="lg" label="Connect Wallet" />
+        <div className="wallet-section">
+          <w3m-button size="md" />
+        </div>
 
-          {isConnected && (
-            <button onClick={handleDeposit} className="pay-btn">
-              Deposit {amount} SOL Now
-            </button>
-          )}
+        {isConnected && amount && Number.parseFloat(amount) > 0 && (
+          <button
+            onClick={handleDeposit}
+            className={`pay-btn ${loading ? "loading" : ""} desktop-only`}
+            disabled={loading}
+          >
+            {loading ? "Processing..." : `Deposit ${amount} SOL`}
+          </button>
+        )}
+      </div>
 
-          <div className="status">
-            <p>{status}</p>
-            {isConnected && <p>Connected: {address?.slice(0,8)}...{address?.slice(-6)}</p>}
-          </div>
-        </>
+      <div className={`status-pill ${status ? "visible" : ""} ${loading ? "loading" : ""}`}>
+        {loading && <span className="spinner"></span>}
+        {status}
+      </div>
+
+      {isConnected && address && (
+        <p className="address-display">
+          {address.slice(0, 4)}...{address.slice(-4)}
+        </p>
       )}
     </div>
   )
