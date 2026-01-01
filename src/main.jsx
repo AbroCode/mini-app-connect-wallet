@@ -6,7 +6,7 @@ import { SolanaAdapter } from '@reown/appkit-adapter-solana/react'
 import { solana, solanaDevnet, solanaTestnet } from '@reown/appkit/networks'
 
 // YOUR REOWN PROJECT ID
-const projectId = 'YOUR_REOWN_PROJECT_ID_HERE'
+const projectId = '1f1ea64e0b931eecba61513d1868ae02'
 
 const metadata = {
   name: 'Solana Mini App',
