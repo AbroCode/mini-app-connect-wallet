@@ -1,11 +1,11 @@
 import React from 'react'
 import ReactDOM from 'react-dom/client'
-import App from './App.tsx'
+import App from './App.jsx'
 import { createAppKit } from '@reown/appkit/react'
 import { SolanaAdapter } from '@reown/appkit-adapter-solana/react'
 import { solana, solanaDevnet, solanaTestnet } from '@reown/appkit/networks'
 
-const projectId = import.meta.env.VITE_PROJECT_ID || 'YOUR_REOWN_PROJECT_ID_HERE' // Use env or paste
+const projectId = import.meta.env.VITE_PROJECT_ID || '1f1ea64e0b931eecba61513d1868ae02' // Use env or paste
 
 const metadata = {
   name: 'Solana Mini App',
