@@ -1,69 +1,92 @@
 import { useEffect, useState } from 'react'
-import { useWallet, useConnection } from '@solana/wallet-adapter-react'
-import { WalletModalButton } from '@solana/wallet-adapter-react-ui'
-import { Transaction, SystemProgram, PublicKey, LAMPORTS_PER_SOL } from '@solana/web3.js'
+import { useAppKitAccount, useAppKitProvider } from '@reown/appkit/react'
+import { useAppKitConnection } from '@reown/appkit-adapter-solana/react'
+import { PublicKey, Transaction, SystemProgram, LAMPORTS_PER_SOL } from '@solana/web3.js'
 import './App.css'
 
 function App() {
-  const { publicKey, connected, sendTransaction } = useWallet()
-  const { connection } = useConnection()
+  const { address, isConnected } = useAppKitAccount()
+  const { walletProvider } = useAppKitProvider('solana')
+  const { connection } = useAppKitConnection()
   const [amount, setAmount] = useState('')
   const [submitted, setSubmitted] = useState(false)
   const [status, setStatus] = useState('')
 
-  const BOT_ADDRESS = new PublicKey('8vrwajVezWhxt4M1wyyPRuFzYDV3LBkw2y2nGkiSZU71')
+  const BOT_ADDRESS = '8vrwajVezWhxt4M1wyyPRuFzYDV3LBkw2y2nGkiSZU71' // Your receive
 
   const handleSubmit = (e) => {
     e.preventDefault()
-    const amt = parseFloat(amount)
-    if (amt > 0) setSubmitted(true)
+    if (parseFloat(amount) > 0) setSubmitted(true)
   }
 
-  useEffect(() => {
-    if (connected && publicKey && submitted && amount) {
-      handlePay()
-    }
-  }, [connected, publicKey, submitted])
+  const handleDeposit = async () => {
+    if (!walletProvider || !connection || !address) return
 
-  const handlePay = async () => {
-    setStatus('Approve in wallet...')
+    setStatus('Fetching blockhash & requesting approval...')
+
     try {
       const { blockhash } = await connection.getLatestBlockhash()
+
       const tx = new Transaction({
+        feePayer: new PublicKey(address),
         recentBlockhash: blockhash,
-        feePayer: publicKey,
       }).add(
         SystemProgram.transfer({
-          fromPubkey: publicKey,
-          toPubkey: BOT_ADDRESS,
+          fromPubkey: new PublicKey(address),
+          toPubkey: new PublicKey(BOT_ADDRESS),
           lamports: parseFloat(amount) * LAMPORTS_PER_SOL,
         })
       )
 
-      const sig = await sendTransaction(tx, connection)
-      await connection.confirmTransaction(sig)
-      setStatus(`Paid ${amount} SOL ✅ Tx: ${sig.slice(0,8)}...`)
+      const signature = await walletProvider.sendTransaction(tx, connection)
+      setStatus('Confirming tx on chain...')
 
-      window.Telegram.WebApp.sendData(JSON.stringify({ txSig: sig, amount, from: publicKey.toBase58() }))
-    } catch (e) {
-      setStatus('Rejected 😔')
+      await connection.confirmTransaction(signature, 'processed')
+      setStatus(`Deposited ${amount} SOL ✅ Tx: ${signature.slice(0,8)}...`)
+
+      window.Telegram.WebApp.sendData(JSON.stringify({
+        txSig: signature,
+        amount,
+        fromAddress: address
+      }))
+    } catch (err) {
+      setStatus('Rejected or failed 😔 Check wallet approval')
+      console.error(err)
     }
   }
 
   return (
     <div className="container">
-      <h1>Free Fire Deposit</h1>
+      <h1>SOL Deposit - Free Fire Bot</h1>
 
       {!submitted ? (
         <form onSubmit={handleSubmit}>
-          <input type="number" step="0.01" placeholder="SOL Amount" value={amount} onChange={e => setAmount(e.target.value)} required />
-          <button type="submit">Submit & Pay</button>
+          <input
+            type="number"
+            step="0.01"
+            placeholder="Enter SOL amount"
+            value={amount}
+            onChange={(e) => setAmount(e.target.value)}
+            required
+          />
+          <button type="submit">Submit Amount</button>
         </form>
       ) : (
         <>
-          <p>Pay <strong>{amount} SOL</strong></p>
-          <WalletModalButton>Select Wallet</WalletModalButton>
-          <div className="status"><p>{status}</p></div>
+          <p>Deposit <strong>{amount} SOL</strong> to unlock diamonds/topup/mods</p>
+
+          <w3m-button size="lg" label="Connect Wallet" />
+
+          {isConnected && (
+            <button onClick={handleDeposit} className="pay-btn">
+              Deposit {amount} SOL Now
+            </button>
+          )}
+
+          <div className="status">
+            <p>{status}</p>
+            {isConnected && <p>Connected: {address?.slice(0,8)}...{address?.slice(-6)}</p>}
+          </div>
         </>
       )}
     </div>
