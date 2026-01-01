@@ -1,8 +1,284 @@
-body { margin: 0; background: var(--tg-theme-bg-color, #121212); color: var(--tg-theme-text-color, #fff); font-family: sans-serif; min-height: 100vh; }
-.container { padding: 40px; text-align: center; max-width: 500px; margin: 0 auto; }
-h1 { font-size: 36px; margin-bottom: 20px; }
-p { font-size: 20px; }
-input { padding: 15px; font-size: 20px; width: 80%; border-radius: 12px; margin: 20px 0; }
-button { padding: 15px 30px; font-size: 20px; background: #00ff9d; color: black; border: none; border-radius: 12px; cursor: pointer; }
-.status { margin-top: 40px; padding: 20px; background: rgba(255,255,255,0.1); border-radius: 16px; }
-w3m-button { margin: 40px auto !important; display: block !important; }
+/* Updated to use professional design tokens matching the brief */
+:root {
+  /* Telegram theme fallbacks */
+  --tg-bg: var(--tg-theme-bg-color, #0a0e27);
+  --tg-card-bg: var(--tg-theme-secondary-bg-color, #141937);
+  --tg-text: var(--tg-theme-text-color, #ffffff);
+  --tg-hint: var(--tg-theme-hint-color, #8b92b0);
+  --tg-accent: var(--tg-theme-link-color, #00d4ff);
+  --tg-button: var(--tg-theme-button-color, #00d4ff);
+  --tg-button-text: var(--tg-theme-button-text-color, #0a0e27);
+
+  /* Design tokens */
+  --color-background: var(--tg-bg);
+  --color-surface: var(--tg-card-bg);
+  --color-primary: var(--tg-accent);
+  --color-text-primary: var(--tg-text);
+  --color-text-secondary: var(--tg-hint);
+  --color-success: #00ff88;
+  --color-error: #ff3366;
+
+  --spacing-xs: 8px;
+  --spacing-sm: 12px;
+  --spacing-md: 16px;
+  --spacing-lg: 20px;
+  --spacing-xl: 24px;
+
+  --radius-sm: 8px;
+  --radius-md: 12px;
+  --radius-lg: 16px;
+  --radius-xl: 20px;
+
+  --shadow-sm: 0 2px 8px rgba(0, 0, 0, 0.1);
+  --shadow-md: 0 4px 16px rgba(0, 0, 0, 0.15);
+  --shadow-glow: 0 0 24px rgba(0, 212, 255, 0.15);
+}
+
+body {
+  margin: 0;
+  background: var(--color-background);
+  color: var(--color-text-primary);
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "SF Pro Display", sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  min-height: 100vh;
+}
+
+.container {
+  padding: var(--spacing-md);
+  max-width: 420px;
+  margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-lg);
+  min-height: 100vh;
+}
+
+.header {
+  text-align: center;
+  padding: var(--spacing-xl) 0 var(--spacing-md);
+}
+
+h1 {
+  margin: 0;
+  font-size: 28px;
+  font-weight: 700;
+  letter-spacing: -0.5px;
+  background: linear-gradient(135deg, var(--color-primary) 0%, #00fff2 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+.subtitle {
+  margin: var(--spacing-xs) 0 0;
+  color: var(--color-text-secondary);
+  font-size: 14px;
+  font-weight: 500;
+}
+
+.card {
+  background: var(--color-surface);
+  padding: var(--spacing-xl);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-md);
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-lg);
+  border: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.input-group {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-sm);
+}
+
+.input-group label {
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  color: var(--color-text-secondary);
+  letter-spacing: 1px;
+}
+
+input {
+  background: rgba(255, 255, 255, 0.03);
+  border: 2px solid rgba(255, 255, 255, 0.08);
+  border-radius: var(--radius-md);
+  padding: var(--spacing-md) var(--spacing-md);
+  font-size: 32px;
+  font-weight: 700;
+  width: 100%;
+  color: var(--color-text-primary);
+  outline: none;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  font-variant-numeric: tabular-nums;
+}
+
+input:focus {
+  border-color: var(--color-primary);
+  background: rgba(255, 255, 255, 0.05);
+  box-shadow: var(--shadow-glow);
+}
+
+input::placeholder {
+  color: var(--color-text-secondary);
+  opacity: 0.4;
+}
+
+.wallet-section {
+  display: flex;
+  justify-content: center;
+  padding: var(--spacing-sm) 0;
+}
+
+/* Enhanced button with gradient and better states */
+.pay-btn {
+  width: 100%;
+  padding: 18px var(--spacing-lg);
+  background: linear-gradient(135deg, var(--color-primary) 0%, #00fff2 100%);
+  color: var(--tg-button-text);
+  border: none;
+  border-radius: var(--radius-md);
+  font-size: 17px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  box-shadow: 0 4px 16px rgba(0, 212, 255, 0.3);
+  position: relative;
+  overflow: hidden;
+}
+
+.pay-btn::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: linear-gradient(135deg, rgba(255, 255, 255, 0.1) 0%, transparent 100%);
+  opacity: 0;
+  transition: opacity 0.2s;
+}
+
+.pay-btn:hover::before {
+  opacity: 1;
+}
+
+.pay-btn:active {
+  transform: scale(0.98);
+  box-shadow: 0 2px 8px rgba(0, 212, 255, 0.4);
+}
+
+.pay-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  transform: none;
+}
+
+.pay-btn.loading {
+  animation: pulse 1.5s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+}
+
+@keyframes pulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.7;
+  }
+}
+
+/* Hide desktop button in Telegram environment, show MainButton instead */
+.desktop-only {
+  display: block;
+}
+
+@media (display-mode: standalone) {
+  .desktop-only {
+    display: none;
+  }
+}
+
+/* Telegram WebApp specific */
+body.telegram-webapp .desktop-only {
+  display: none;
+}
+
+/* Enhanced status pill with loading spinner */
+.status-pill {
+  position: fixed;
+  bottom: var(--spacing-xl);
+  left: 50%;
+  transform: translateX(-50%) translateY(120px);
+  background: rgba(20, 25, 55, 0.95);
+  backdrop-filter: blur(12px);
+  color: var(--color-text-primary);
+  padding: var(--spacing-sm) var(--spacing-lg);
+  border-radius: var(--radius-xl);
+  font-size: 14px;
+  font-weight: 600;
+  transition: transform 0.4s cubic-bezier(0.18, 0.89, 0.32, 1.28);
+  z-index: 100;
+  white-space: nowrap;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  box-shadow: var(--shadow-md);
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-sm);
+}
+
+.status-pill.visible {
+  transform: translateX(-50%) translateY(0);
+}
+
+.status-pill.loading {
+  border-color: var(--color-primary);
+  box-shadow: var(--shadow-glow);
+}
+
+/* Added spinner animation for loading states */
+.spinner {
+  width: 14px;
+  height: 14px;
+  border: 2px solid rgba(255, 255, 255, 0.2);
+  border-top-color: var(--color-primary);
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.address-display {
+  text-align: center;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--color-text-secondary);
+  margin: 0;
+  padding: var(--spacing-sm);
+  font-family: ui-monospace, "SF Mono", Monaco, monospace;
+  letter-spacing: 0.5px;
+}
+
+/* Dark theme support for wallets that use light mode */
+@media (prefers-color-scheme: light) {
+  :root {
+    --tg-bg: var(--tg-theme-bg-color, #ffffff);
+    --tg-card-bg: var(--tg-theme-secondary-bg-color, #f4f5f7);
+    --tg-text: var(--tg-theme-text-color, #000000);
+    --tg-hint: var(--tg-theme-hint-color, #6c727f);
+    --tg-button-text: var(--tg-theme-button-text-color, #ffffff);
+  }
+
+  h1 {
+    -webkit-text-fill-color: unset;
+    background: none;
+    color: #0066ff;
+  }
+}
