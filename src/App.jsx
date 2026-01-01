@@ -1,92 +1,54 @@
-import { useEffect, useState } from 'react'
-import { useAppKitAccount, useAppKitProvider } from '@reown/appkit/react'
-import { useAppKitConnection } from '@reown/appkit-adapter-solana/react'
-import { PublicKey, Transaction, SystemProgram, LAMPORTS_PER_SOL } from '@solana/web3.js'
+import { useState } from 'react'
 import './App.css'
 
 function App() {
-  const { address, isConnected } = useAppKitAccount()
-  const { walletProvider } = useAppKitProvider('solana')
-  const { connection } = useAppKitConnection()
   const [amount, setAmount] = useState('')
   const [submitted, setSubmitted] = useState(false)
-  const [status, setStatus] = useState('')
 
-  const BOT_ADDRESS = '8vrwajVezWhxt4M1wyyPRuFzYDV3LBkw2y2nGkiSZU71' // Your receive
+  const BOT_ADDRESS = '8vrwajVezWhxt4M1wyyPRuFzYDV3LBkw2y2nGkiSZU71'
 
   const handleSubmit = (e) => {
     e.preventDefault()
-    if (parseFloat(amount) > 0) setSubmitted(true)
+    const amt = parseFloat(amount)
+    if (amt > 0) setSubmitted(true)
   }
 
-  const handleDeposit = async () => {
-    if (!walletProvider || !connection || !address) return
-
-    setStatus('Fetching blockhash & requesting approval...')
-
-    try {
-      const { blockhash } = await connection.getLatestBlockhash()
-
-      const tx = new Transaction({
-        feePayer: new PublicKey(address),
-        recentBlockhash: blockhash,
-      }).add(
-        SystemProgram.transfer({
-          fromPubkey: new PublicKey(address),
-          toPubkey: new PublicKey(BOT_ADDRESS),
-          lamports: parseFloat(amount) * LAMPORTS_PER_SOL,
-        })
-      )
-
-      const signature = await walletProvider.sendTransaction(tx, connection)
-      setStatus('Confirming tx on chain...')
-
-      await connection.confirmTransaction(signature, 'processed')
-      setStatus(`Deposited ${amount} SOL ✅ Tx: ${signature.slice(0,8)}...`)
-
-      window.Telegram.WebApp.sendData(JSON.stringify({
-        txSig: signature,
-        amount,
-        fromAddress: address
-      }))
-    } catch (err) {
-      setStatus('Rejected or failed 😔 Check wallet approval')
-      console.error(err)
-    }
+  // Phantom deep link for connect + transfer (coordinated, no reload)
+  const phantomDeepLink = () => {
+    const params = new URLSearchParams({
+      app_url: window.location.origin,
+      redirect_link: window.location.href, // Return to same page with state
+      cluster: 'mainnet-beta',
+      amount: (parseFloat(amount) * 1e9).toString(), // lamports
+      to: BOT_ADDRESS,
+      // Add reference or memo if needed for bot verify
+    })
+    const link = `https://phantom.app/ul/v1/transfer?${params.toString()}`
+    window.location.href = link // Opens Phantom, approves → return seamless
   }
 
   return (
     <div className="container">
-      <h1>SOL Deposit - Free Fire Bot</h1>
+      <h1>Free Fire SOL Deposit</h1>
 
       {!submitted ? (
         <form onSubmit={handleSubmit}>
-          <input
-            type="number"
-            step="0.01"
-            placeholder="Enter SOL amount"
-            value={amount}
-            onChange={(e) => setAmount(e.target.value)}
-            required
-          />
+          <input type="number" step="0.01" placeholder="Enter SOL amount" value={amount} onChange={e => setAmount(e.target.value)} required />
           <button type="submit">Submit Amount</button>
         </form>
       ) : (
         <>
-          <p>Deposit <strong>{amount} SOL</strong> to unlock diamonds/topup/mods</p>
+          <p>Deposit <strong>{amount} SOL</strong> for diamonds/topup/mods</p>
 
-          <w3m-button size="lg" label="Connect Wallet" />
+          {/* Pro Phantom button - deep link, coordinated flow */}
+          <button onClick={phantomDeepLink} className="phantom-btn">
+            Pay with Phantom (Recommended)
+          </button>
 
-          {isConnected && (
-            <button onClick={handleDeposit} className="pay-btn">
-              Deposit {amount} SOL Now
-            </button>
-          )}
+          {/* Fallback for other wallets */}
+          <w3m-button size="lg" label="Other Wallets (100+)" />
 
-          <div className="status">
-            <p>{status}</p>
-            {isConnected && <p>Connected: {address?.slice(0,8)}...{address?.slice(-6)}</p>}
-          </div>
+          <p>To: {BOT_ADDRESS.slice(0,8)}...{BOT_ADDRESS.slice(-6)}</p>
         </>
       )}
     </div>
