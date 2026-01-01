@@ -5,13 +5,13 @@ import { createAppKit } from '@reown/appkit/react'
 import { SolanaAdapter } from '@reown/appkit-adapter-solana/react'
 import { solana, solanaDevnet, solanaTestnet } from '@reown/appkit/networks'
 
-// REPLACE WITH YOUR REOWN PROJECT ID
-const projectId = '1f1ea64e0b931eecba61513d1868ae02'
+// YOUR REOWN PROJECT ID
+const projectId = 'YOUR_REOWN_PROJECT_ID_HERE'
 
 const metadata = {
   name: 'Solana Mini App',
   description: 'Connect wallet for bot automation',
-  url: 'https://your-vercel-url.vercel.app', // Update after deploy
+  url: 'https://your-vercel-url.vercel.app',
   icons: ['https://avatars.githubusercontent.com/u/179229932']
 }
 
@@ -24,7 +24,9 @@ createAppKit({
   metadata,
   features: {
     allWallets: true,
-    analytics: true
+    analytics: true,
+    connectMethodsOrder: ['wallet'],  // Still only wallets in list
+    showQrModal: true  // KEY: Forces QR fallback for browser testing (scan with Phantom app)
   }
 })
 
