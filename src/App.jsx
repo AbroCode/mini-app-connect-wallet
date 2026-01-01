@@ -1,26 +1,37 @@
-import { useAppKitAccount } from '@reown/appkit/react'
+import { useWallet, WalletMultiButton } from '@solana/wallet-adapter-react'
 import { useEffect, useState } from 'react'
+import './App.css'
 
 function App() {
-  const { address, isConnected } = useAppKitAccount()
+  const { publicKey, connected } = useWallet()
   const [sent, setSent] = useState(false)
 
   useEffect(() => {
-    if (isConnected && address && !sent) {
+    if (connected && publicKey && !sent) {
+      const address = publicKey.toBase58()
       const data = { walletAddress: address, chain: 'solana' }
       window.Telegram.WebApp.sendData(JSON.stringify(data))
       setSent(true)
       window.Telegram.WebApp.expand()
     }
-  }, [isConnected, address, sent])
+  }, [connected, publicKey, sent])
 
   return (
-    <>
-      <w3m-button size="lg" />
-      {isConnected && address && (
-        <p>Connected: {address.slice(0, 8)}...{address.slice(-6)} (Sent to bot ✅)</p>
+    <div className="container">
+      <h1>Connect Solana Wallet</h1>
+      <p>For SOL withdraws & Free Fire rewards</p>
+
+      {/* Pro button opens modal with wallet list only */}
+      <WalletMultiButton />
+
+      {connected && publicKey && (
+        <div className="connected">
+          <p>Connected ✅</p>
+          <strong>{publicKey.toBase58().slice(0, 8)}...{publicKey.toBase58().slice(-6)}</strong>
+          <p>(Address sent to bot)</p>
+        </div>
       )}
-    </>
+    </div>
   )
 }
 
