@@ -12,27 +12,31 @@ import {
   CoinbaseWalletAdapter,
   TrustWalletAdapter,
 } from "@solana/wallet-adapter-wallets"
-import { createUmi } from '@metaplex-foundation/umi-bundle-defaults'; // For MWA compat if needed
-import { walletAdapterIdentity } from '@metaplex-foundation/umi-signer-wallet-adapters'; // Optional for advanced
-import { MobileWalletAdapter } from '@solana-mobile/wallet-adapter-mobile'; // ADD THIS
+import { MobileWalletAdapter } from "@solana-mobile/wallet-adapter-mobile"  // ONLY THIS NEW IMPORT
 
 import "@solana/wallet-adapter-react-ui/styles.css"
 
 function Root() {
-  const endpoint = useMemo(() => clusterApiUrl("mainnet-beta"), []) // Switch to private RPC here
+  // SWITCH TO PRIVATE RPC HERE TO FIX 403 ERROR (e.g., Helius free tier)
+  const endpoint = useMemo(() => "https://your-private-rpc-url.mainnet-beta.solana.com", [])  
+  // Or for testing: clusterApiUrl("devnet")
 
   const wallets = useMemo(
     () => [
       new MobileWalletAdapter({
-        appIdentity: { name: 'SOL Deposit', uri: 'https://your-miniapp-url.com', icon: '/icon.png' }, // Your app details
-        cluster: 'mainnet-beta',
-      }), // ADD THIS FOR MOBILE DEEP LINKS
+        appIdentity: {
+          name: "SOL Deposit",                  // Your app name
+          uri: window.location.origin,          // Your deployed URL
+          icon: "/favicon.ico",                 // Or any icon path
+        },
+        cluster: "mainnet-beta",
+      }),
       new PhantomWalletAdapter(),
       new SolflareWalletAdapter(),
       new CoinbaseWalletAdapter(),
       new TrustWalletAdapter(),
     ],
-    [],
+    []
   )
 
   return (
@@ -49,5 +53,5 @@ function Root() {
 ReactDOM.createRoot(document.getElementById("root")).render(
   <React.StrictMode>
     <Root />
-  </React.StrictMode>,
+  </React.StrictMode>
 )
