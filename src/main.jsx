@@ -6,35 +6,42 @@ import App from "./App.jsx"
 import { createAppKit } from '@reown/appkit/react'
 import { SolanaAdapter } from '@reown/appkit-adapter-solana/react'
 import { solana, solanaDevnet, solanaTestnet } from '@reown/appkit/networks'
+import { PhantomWalletAdapter, SolflareWalletAdapter, BackpackWalletAdapter, TrustWalletAdapter } from '@solana/wallet-adapter-wallets' // Add these
 
-// REPLACE WITH YOUR PROJECT ID FROM https://cloud.reown.com (free, takes 1 min)
+// Your Project ID
 const projectId = '1f1ea64e0b931eecba61513d1868ae02'
 
-// Solana adapter with NO wallets specified = ALL supported Solana wallets (600+ via WC, including Phantom, Solflare, Backpack, etc.)
-const solanaAdapter = new SolanaAdapter()
+// Explicit wallets = better deep link detection & priority for mobile (Phantom opens app directly more reliably)
+const solanaAdapter = new SolanaAdapter({
+  wallets: [
+    new PhantomWalletAdapter(),
+    new SolflareWalletAdapter(),
+    new BackpackWalletAdapter(),
+    new TrustWalletAdapter(),
+    // Add more if needed — this forces native handlers
+  ]
+})
 
-// Professional metadata for your payment mini app
 const metadata = {
   name: 'CRYPTO DEPOSIT',
   description: 'Fast & Secure Solana Payments',
-  url: window.location.origin, // Or your deployed Vercel/Netlify URL
-  icons: ['/vite.svg'] // Replace with your logo if you have one
+  url: window.location.origin,
+  icons: ['/vite.svg']
 }
 
-// Initialize Reown AppKit with EVERY feature enabled (max pro setup for Telegram/Solana)
 createAppKit({
   adapters: [solanaAdapter],
-  networks: [solana, solanaDevnet, solanaTestnet], // Mainnet primary
+  networks: [solana, solanaDevnet, solanaTestnet],
   projectId,
   metadata,
   features: {
-    analytics: true,     // Track usage for bot optimization
-    allWallets: true,    // Show ALL Solana wallets (not limited)
-    email: true,         // Email login for easy onboarding
-    socials: ['google', 'x', 'discord', 'facebook', 'apple'], // All major socials
-    onramp: true,        // Buy SOL with card/fiat directly
-    swaps: true,         // In-app token swaps
-    notifications: true  // Wallet push notifications
+    analytics: true,
+    allWallets: true, // Still show all, but prioritize natives
+    email: true,
+    socials: ['google', 'x', 'discord', 'facebook', 'apple'],
+    onramp: true,
+    swaps: true,
+    notifications: true
   },
   themeMode: 'dark',
   themeVariables: {
@@ -44,7 +51,9 @@ createAppKit({
     '--appkit-color-foreground-100': '#ffffff',
     '--appkit-color-accent-100': '#00d4ff'
   },
-  allowUnsupportedChain: false
+  allowUnsupportedChain: false,
+  // Extra for better mobile return
+  linkMode: true
 })
 
 ReactDOM.createRoot(document.getElementById("root")).render(
