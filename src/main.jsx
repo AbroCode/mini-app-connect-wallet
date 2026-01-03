@@ -7,36 +7,36 @@ import { createAppKit } from '@reown/appkit/react'
 import { SolanaAdapter } from '@reown/appkit-adapter-solana/react'
 import { solana, solanaDevnet, solanaTestnet } from '@reown/appkit/networks'
 
-// Replace with your Project ID from cloud.reown.com
-const projectId = 'YOUR_PROJECT_ID_HERE'
+// REPLACE WITH YOUR PROJECT ID FROM https://cloud.reown.com (free, takes 1 min)
+const projectId = '1f1ea64e0b931eecba61513d1868ae02'
 
-// Create Solana adapter — NO wallets array = ALL supported Solana wallets (Phantom, Solflare, Backpack + hundreds via WC)
+// Solana adapter with NO wallets specified = ALL supported Solana wallets (600+ via WC, including Phantom, Solflare, Backpack, etc.)
 const solanaAdapter = new SolanaAdapter()
 
-// Pro metadata for your payment bot
+// Professional metadata for your payment mini app
 const metadata = {
-  name: 'SOL Deposit Payment',
-  description: 'Secure & Fast Solana Deposits via Telegram Mini App',
-  url: 'https://your-deployed-url.vercel.app', // Your live URL
-  icons: ['https://your-icon-url-or-vite.svg']
+  name: 'CRYPTO DEPOSIT',
+  description: 'Fast & Secure Solana Payments',
+  url: window.location.origin, // Or your deployed Vercel/Netlify URL
+  icons: ['/vite.svg'] // Replace with your logo if you have one
 }
 
-// Initialize AppKit with EVERY Reown feature enabled for Solana/Telegram
+// Initialize Reown AppKit with EVERY feature enabled (max pro setup for Telegram/Solana)
 createAppKit({
   adapters: [solanaAdapter],
-  networks: [solana, solanaDevnet, solanaTestnet], // Mainnet + test for flexibility
-  metadata,
+  networks: [solana, solanaDevnet, solanaTestnet], // Mainnet primary
   projectId,
+  metadata,
   features: {
-    analytics: true,         // Track connects/deposits for bot optimization
-    allWallets: true,        // Show ALL Solana wallets (not just recent/popular)
-    email: true,             // Email login (great for onboarding new users)
-    socials: true,           // All social logins (Google, Discord, X, etc.)
-    onramp: true,            // Buy SOL with fiat directly in modal
-    swaps: true,             // In-app token swaps
-    notifications: true      // Wallet notifications (pro for payment bots)
+    analytics: true,     // Track usage for bot optimization
+    allWallets: true,    // Show ALL Solana wallets (not limited)
+    email: true,         // Email login for easy onboarding
+    socials: ['google', 'x', 'discord', 'facebook', 'apple'], // All major socials
+    onramp: true,        // Buy SOL with card/fiat directly
+    swaps: true,         // In-app token swaps
+    notifications: true  // Wallet push notifications
   },
-  themeMode: 'dark',         // Matches your black Telegram theme
+  themeMode: 'dark',
   themeVariables: {
     '--appkit-border-radius-m': '12px',
     '--appkit-color-background-100': '#000000',
