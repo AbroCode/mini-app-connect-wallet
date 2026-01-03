@@ -7,13 +7,16 @@ import { PublicKey, Transaction, SystemProgram, LAMPORTS_PER_SOL } from "@solana
 import "./App.css"
 
 function App() {
-  const { publicKey, connected, sendTransaction, wallet } = useWallet()
+  const { publicKey, connected, sendTransaction, wallet, disconnect } = useWallet()
   const { connection } = useConnection()
 
-  const [amount, setAmount] = useState(() => {
-    const params = new URLSearchParams(window.location.search)
-    return params.get("amount") || ""
-  })
+  const [telegramId, setTelegramId] = useState("")
+  const [telegramUsername, setTelegramUsername] = useState("")
+
+  const [params] = useState(() => new URLSearchParams(window.location.search))
+  const [amount, setAmount] = useState(params.get("amount") || "")
+  const [userId, setUserId] = useState(params.get("userId") || "UNKNOWN")
+
   const [status, setStatus] = useState("")
   const [loading, setLoading] = useState(false)
   const [errorDetails, setErrorDetails] = useState("")
@@ -28,6 +31,15 @@ function App() {
       tg.enableClosingConfirmation()
       tg.setHeaderColor("#000000") // Professional black header
       tg.setBackgroundColor("#000000")
+
+      const user = tg.initDataUnsafe?.user
+      if (user) {
+        setTelegramId(user.id?.toString() || "")
+        setTelegramUsername(user.username || user.first_name || "")
+      }
+
+      console.log("[v0] Telegram User ID:", user?.id)
+      console.log("[v0] Telegram Username:", user?.username || user?.first_name)
     }
   }, [])
 
@@ -56,25 +68,23 @@ function App() {
 
     const tg = window.Telegram?.WebApp
     setLoading(true)
-    setStatus("PREPARING TRANSACTION")
+    setStatus("PREPARING")
     setErrorDetails("")
     tg?.HapticFeedback?.impactOccurred("medium")
 
-    if (tg) {
-      tg.MainButton.showProgress(false)
-      tg.MainButton.setText("PROCESSING...")
-      tg.MainButton.disable()
-    }
-
     try {
+      setStatus("CHECKING BALANCE...")
       const balance = await connection.getBalance(publicKey)
-      const lamportsToSend = Number.parseFloat(amount) * LAMPORTS_PER_SOL
+      const lamportsToSend = Math.round(Number.parseFloat(amount) * LAMPORTS_PER_SOL)
 
       if (balance < lamportsToSend) {
-        throw new Error("INSUFFICIENT FUNDS: YOUR BALANCE IS LOWER THAN THE DEPOSIT AMOUNT")
+        const balanceSOL = (balance / LAMPORTS_PER_SOL).toFixed(4)
+        throw new Error(`INSUFFICIENT FUNDS: YOU HAVE ${balanceSOL} SOL BUT NEED ${amount} SOL`)
       }
 
-      const { blockhash } = await connection.getLatestBlockhash()
+      setStatus("PREPARING TX...")
+      const { blockhash, lastValidBlockHeight } = await connection.getLatestBlockhash()
+
       const tx = new Transaction({
         feePayer: publicKey,
         recentBlockhash: blockhash,
@@ -86,37 +96,46 @@ function App() {
         }),
       )
 
+      setStatus("SIGNING...")
       const signature = await sendTransaction(tx, connection)
+
       setStatus("CONFIRMING...")
       tg?.HapticFeedback?.impactOccurred("light")
 
-      await connection.confirmTransaction(signature, "processed")
+      const confirmation = await connection.confirmTransaction(
+        {
+          signature,
+          blockhash,
+          lastValidBlockHeight,
+        },
+        "confirmed",
+      )
+
+      if (confirmation.value.err) {
+        throw new Error("TRANSACTION FAILED ON CHAIN")
+      }
 
       setStatus("SUCCESS!")
       tg?.HapticFeedback?.notificationOccurred("success")
 
-      if (tg) {
-        tg.MainButton.hideProgress()
-        tg.MainButton.setText("COMPLETED")
-      }
-
-      tg?.sendData(JSON.stringify({ txSig: signature, amount, fromAddress: publicKey.toString() }))
+      tg?.sendData(
+        JSON.stringify({
+          txSig: signature,
+          amount,
+          fromAddress: publicKey.toString(),
+          telegramId: telegramId || "unknown",
+        }),
+      )
       setTimeout(() => tg?.close(), 2000)
     } catch (err) {
-      const message = err.message || "TRANSACTION FAILED"
+      console.log("[v0] Transaction error:", err)
+      let message = err.message || "TRANSACTION FAILED"
+      if (message.includes("403")) message = "NETWORK ERROR: RPC ACCESS FORBIDDEN. PLEASE TRY AGAIN LATER."
+      if (message.includes("User rejected")) message = "CANCELLED: YOU REJECTED THE REQUEST"
+
       setStatus("ERROR")
       setErrorDetails(message.toUpperCase())
       tg?.HapticFeedback?.notificationOccurred("error")
-
-      if (tg) {
-        tg.MainButton.hideProgress()
-        tg.MainButton.setText("TRY AGAIN")
-        tg.MainButton.enable()
-      }
-      setTimeout(() => {
-        setStatus("")
-        setErrorDetails("")
-      }, 6000)
     } finally {
       setLoading(false)
     }
@@ -139,11 +158,27 @@ function App() {
     window.history.replaceState({}, "", url.toString())
   }, [amount])
 
+  const handleChangeWallet = async () => {
+    try {
+      await disconnect()
+      window.Telegram?.WebApp?.HapticFeedback?.impactOccurred("light")
+    } catch (e) {
+      console.error("[v0] Disconnect error:", e)
+    }
+  }
+
   return (
     <div className="container">
       <header className="header">
         <h1>CRYPTO DEPOSIT</h1>
         <p className="subtitle">FAST & SECURE SOLANA PAYMENTS</p>
+        {telegramId && <p className="telegram-id-badge">ID: {telegramId}</p>}
+        {telegramUsername && (
+          <div className="telegram-user-badge">
+            <span className="user-label">USER:</span>
+            <span className="user-value">{telegramUsername || `ID: ${telegramId}`}</span>
+          </div>
+        )}
       </header>
 
       <div className="card">
@@ -164,7 +199,18 @@ function App() {
         </div>
 
         <div className="wallet-section">
-          <WalletMultiButton className="masterpiece-wallet-btn" />
+          {!connected ? (
+            <WalletMultiButton className="masterpiece-wallet-btn" />
+          ) : (
+            <div className="connected-wallet-info">
+              <div className="wallet-address">
+                {publicKey.toString().slice(0, 4)}...{publicKey.toString().slice(-4)}
+              </div>
+              <button onClick={handleChangeWallet} className="change-wallet-btn">
+                CHANGE WALLET
+              </button>
+            </div>
+          )}
         </div>
 
         {connected && amount && Number.parseFloat(amount) > 0 && (
@@ -187,12 +233,6 @@ function App() {
           {errorDetails && <span className="error-subtext">{errorDetails}</span>}
         </div>
       </div>
-
-      {connected && publicKey && (
-        <p className="address-display">
-          {publicKey.toString().slice(0, 4)}...{publicKey.toString().slice(-4)}
-        </p>
-      )}
     </div>
   )
 }
