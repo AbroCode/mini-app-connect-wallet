@@ -16,7 +16,6 @@ const solanaAdapter = new SolanaAdapter({
   wallets: [
     new PhantomWalletAdapter(),
     new SolflareWalletAdapter(),
-    new BackpackWalletAdapter(),
     new TrustWalletAdapter(),
     // Add more if needed — this forces native handlers
   ]
@@ -37,8 +36,7 @@ createAppKit({
   features: {
     analytics: true,
     allWallets: true, // Still show all, but prioritize natives
-    email: true,
-    socials: ['google', 'x', 'discord', 'facebook', 'apple'],
+    email: false,
     onramp: true,
     swaps: true,
     notifications: true
