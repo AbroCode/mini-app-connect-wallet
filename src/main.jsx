@@ -1,57 +1,54 @@
 "use client"
 
-import React, { useMemo } from "react"
+import React from "react"
 import ReactDOM from "react-dom/client"
 import App from "./App.jsx"
-import { ConnectionProvider, WalletProvider } from "@solana/wallet-adapter-react"
-import { WalletModalProvider } from "@solana/wallet-adapter-react-ui"
-import { clusterApiUrl } from "@solana/web3.js"
-import {
-  PhantomWalletAdapter,
-  SolflareWalletAdapter,
-  CoinbaseWalletAdapter,
-  TrustWalletAdapter,
-} from "@solana/wallet-adapter-wallets"
-import { MobileWalletAdapter } from "@solana-mobile/wallet-adapter-mobile"  // ONLY THIS NEW IMPORT
+import { createAppKit } from '@reown/appkit/react'
+import { SolanaAdapter } from '@reown/appkit-adapter-solana/react'
+import { solana, solanaDevnet, solanaTestnet } from '@reown/appkit/networks'
 
-import "@solana/wallet-adapter-react-ui/styles.css"
+// Replace with your Project ID from cloud.reown.com
+const projectId = 'YOUR_PROJECT_ID_HERE'
 
-function Root() {
-  // SWITCH TO PRIVATE RPC HERE TO FIX 403 ERROR (e.g., Helius free tier)
-  const endpoint = useMemo(() => "https://your-private-rpc-url.mainnet-beta.solana.com", [])  
-  // Or for testing: clusterApiUrl("devnet")
+// Create Solana adapter — NO wallets array = ALL supported Solana wallets (Phantom, Solflare, Backpack + hundreds via WC)
+const solanaAdapter = new SolanaAdapter()
 
-  const wallets = useMemo(
-    () => [
-      new MobileWalletAdapter({
-        appIdentity: {
-          name: "SOL Deposit",                  // Your app name
-          uri: window.location.origin,          // Your deployed URL
-          icon: "/favicon.ico",                 // Or any icon path
-        },
-        cluster: "mainnet-beta",
-      }),
-      new PhantomWalletAdapter(),
-      new SolflareWalletAdapter(),
-      new CoinbaseWalletAdapter(),
-      new TrustWalletAdapter(),
-    ],
-    []
-  )
-
-  return (
-    <ConnectionProvider endpoint={endpoint}>
-      <WalletProvider wallets={wallets} autoConnect>
-        <WalletModalProvider>
-          <App />
-        </WalletModalProvider>
-      </WalletProvider>
-    </ConnectionProvider>
-  )
+// Pro metadata for your payment bot
+const metadata = {
+  name: 'SOL Deposit Payment',
+  description: 'Secure & Fast Solana Deposits via Telegram Mini App',
+  url: 'https://your-deployed-url.vercel.app', // Your live URL
+  icons: ['https://your-icon-url-or-vite.svg']
 }
+
+// Initialize AppKit with EVERY Reown feature enabled for Solana/Telegram
+createAppKit({
+  adapters: [solanaAdapter],
+  networks: [solana, solanaDevnet, solanaTestnet], // Mainnet + test for flexibility
+  metadata,
+  projectId,
+  features: {
+    analytics: true,         // Track connects/deposits for bot optimization
+    allWallets: true,        // Show ALL Solana wallets (not just recent/popular)
+    email: true,             // Email login (great for onboarding new users)
+    socials: true,           // All social logins (Google, Discord, X, etc.)
+    onramp: true,            // Buy SOL with fiat directly in modal
+    swaps: true,             // In-app token swaps
+    notifications: true      // Wallet notifications (pro for payment bots)
+  },
+  themeMode: 'dark',         // Matches your black Telegram theme
+  themeVariables: {
+    '--appkit-border-radius-m': '12px',
+    '--appkit-color-background-100': '#000000',
+    '--appkit-color-background-200': '#0a0a0a',
+    '--appkit-color-foreground-100': '#ffffff',
+    '--appkit-color-accent-100': '#00d4ff'
+  },
+  allowUnsupportedChain: false
+})
 
 ReactDOM.createRoot(document.getElementById("root")).render(
   <React.StrictMode>
-    <Root />
+    <App />
   </React.StrictMode>
 )
