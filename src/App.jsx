@@ -21,68 +21,98 @@ function App() {
   const BOT_ADDRESS = "8vrwajVezWhxt4M1wyyPRuFzYDV3LBkw2y2nGkiSZU71"
 
   const handleDeposit = useCallback(async () => {
-    if (!connected) {
-      open()
-      return
+  if (!connected) {
+    open()
+    return
+  }
+
+  if (!walletProvider?.signAndSendTransaction || !connection || !address || !amount) return
+
+  const tg = window.Telegram?.WebApp
+  const publicKey = new PublicKey(address)
+
+  setLoading(true)
+  setStatus("PREPARING")
+  setErrorDetails("")
+  tg?.HapticFeedback?.impactOccurred("medium")
+
+  try {
+    // Balance check (from second version)
+    setStatus("CHECKING BALANCE...")
+    const balance = await connection.getBalance(publicKey)
+    const lamportsToSend = Math.round(Number.parseFloat(amount) * LAMPORTS_PER_SOL)
+    if (balance < lamportsToSend) {
+      const balanceSOL = (balance / LAMPORTS_PER_SOL).toFixed(4)
+      throw new Error(`INSUFFICIENT FUNDS: YOU HAVE ${balanceSOL} SOL BUT NEED ${amount} SOL`)
     }
 
-    if (!walletProvider?.signAndSendTransaction || !connection || !address || !amount) return
+    setStatus("FETCHING BLOCKHASH")
+    const { blockhash, lastValidBlockHeight } = await connection.getLatestBlockhash("confirmed")
 
-    const tg = window.Telegram?.WebApp
-    const publicKey = new PublicKey(address)
+    const tx = new Transaction({
+      feePayer: publicKey,
+      recentBlockhash: blockhash,
+    }).add(
+      SystemProgram.transfer({
+        fromPubkey: publicKey,
+        toPubkey: new PublicKey(BOT_ADDRESS),
+        lamports: lamportsToSend,
+      }),
+    )
 
-    setLoading(true)
-    setStatus("PREPARING")
-    setErrorDetails("")
-    tg?.HapticFeedback?.impactOccurred("medium")
+    setStatus("CONFIRM IN WALLET")
 
-    try {
-      setStatus("FETCHING BLOCKHASH")
-      const { blockhash, lastValidBlockHeight } = await connection.getLatestBlockhash("confirmed")
-
-      const tx = new Transaction({
-        feePayer: publicKey,
-        recentBlockhash: blockhash,
-      }).add(
-        SystemProgram.transfer({
-          fromPubkey: publicKey,
-          toPubkey: new PublicKey(BOT_ADDRESS),
-          lamports: Math.round(Number.parseFloat(amount) * LAMPORTS_PER_SOL),
-        }),
-      )
-
-      setStatus("CONFIRM IN WALLET")
-
-      const signature = await walletProvider.signAndSendTransaction(tx)
-
-      setStatus("CONFIRMING...")
-      const confirmation = await connection.confirmTransaction(
-        {
-          signature,
-          blockhash,
-          lastValidBlockHeight,
-        },
-        "confirmed",
-      )
-
-      if (confirmation.value.err) throw new Error("TRANSACTION FAILED")
-
-      setStatus("SUCCESS!")
-      tg?.HapticFeedback?.notificationOccurred("success")
-
-      tg?.sendData(JSON.stringify({ signature, amount }))
-      setTimeout(() => tg?.close(), 1500)
-    } catch (err) {
-      console.error("[v0] Tx Error:", err)
-      setStatus("ERROR")
-      setErrorDetails(
-        err.message?.includes("User rejected") ? "CANCELLED BY USER" : err.message?.toUpperCase() || "FAILED",
-      )
-      tg?.HapticFeedback?.notificationOccurred("error")
-    } finally {
-      setLoading(false)
+    let signature
+    // Detect wallet and use appropriate signing method
+    const walletName = walletProvider?.name || "unknown"  // Assuming walletProvider has a name property
+    if (walletName.toLowerCase().includes("trust")) {
+      // Fallback for Trust Wallet using adapter's sendTransaction (assume useWallet hook provides it)
+      const { sendTransaction } = useWallet()  // Import and use this hook
+      signature = await sendTransaction(tx)
+    } else {
+      // Default to AppKit for Phantom and others
+      signature = await walletProvider.signAndSendTransaction(tx)
     }
-  }, [connected, walletProvider, connection, address, amount, open])
+
+    setStatus("CONFIRMING...")
+    tg?.HapticFeedback?.impactOccurred("light")
+
+    const confirmation = await connection.confirmTransaction(
+      {
+        signature,
+        blockhash,
+        lastValidBlockHeight,
+      },
+      "confirmed",
+    )
+
+    if (confirmation.value.err) throw new Error("TRANSACTION FAILED ON CHAIN")
+
+    setStatus("SUCCESS!")
+    tg?.HapticFeedback?.notificationOccurred("success")
+
+    // Enriched data sending (from second version)
+    tg?.sendData(
+      JSON.stringify({
+        txSig: signature,
+        amount,
+        fromAddress: publicKey.toString(),
+        telegramId: telegramId || "unknown",
+      }),
+    )
+    setTimeout(() => tg?.close(), 2000)
+  } catch (err) {
+    console.error("[v0] Tx Error:", err)
+    let message = err.message || "TRANSACTION FAILED"
+    if (message.includes("403")) message = "NETWORK ERROR: RPC ACCESS FORBIDDEN. PLEASE TRY AGAIN LATER."
+    if (message.includes("User rejected")) message = "CANCELLED: YOU REJECTED THE REQUEST"
+    setStatus("ERROR")
+    setErrorDetails(message.toUpperCase())
+    tg?.HapticFeedback?.notificationOccurred("error")
+  } finally {
+    setLoading(false)
+  }
+}, [connected, walletProvider, connection, address, amount, open, telegramId])  // Added telegramId to deps
 
   useEffect(() => {
     const tg = window.Telegram?.WebApp
