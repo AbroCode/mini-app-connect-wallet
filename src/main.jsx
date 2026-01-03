@@ -9,8 +9,6 @@ import { clusterApiUrl } from "@solana/web3.js"
 import {
   PhantomWalletAdapter,
   SolflareWalletAdapter,
-  BackpackWalletAdapter,
-  BitgetWalletAdapter,
   CoinbaseWalletAdapter,
   TrustWalletAdapter,
 } from "@solana/wallet-adapter-wallets"
@@ -24,8 +22,6 @@ function Root() {
     () => [
       new PhantomWalletAdapter(),
       new SolflareWalletAdapter(),
-      new BackpackWalletAdapter(),
-      new BitgetWalletAdapter(),
       new CoinbaseWalletAdapter(),
       new TrustWalletAdapter(),
     ],
