@@ -1,15 +1,14 @@
 "use client"
 
 import { useEffect, useState } from "react"
-import { useAppKitAccount, useAppKitProvider } from "@reown/appkit/react"
-import { useAppKitConnection } from "@reown/appkit-adapter-solana/react"
+import { useWallet, useConnection } from "@solana/wallet-adapter-react"
+import { WalletMultiButton } from "@solana/wallet-adapter-react-ui"
 import { PublicKey, Transaction, SystemProgram, LAMPORTS_PER_SOL } from "@solana/web3.js"
 import "./App.css"
 
 function App() {
-  const { address, isConnected } = useAppKitAccount()
-  const { walletProvider } = useAppKitProvider("solana")
-  const { connection } = useAppKitConnection()
+  const { publicKey, connected, sendTransaction } = useWallet()
+  const { connection } = useConnection()
 
   const [amount, setAmount] = useState(() => {
     const params = new URLSearchParams(window.location.search)
@@ -37,7 +36,7 @@ function App() {
     const tg = window.Telegram?.WebApp
     if (!tg) return
 
-    const canDeposit = isConnected && amount && Number.parseFloat(amount) > 0 && !loading
+    const canDeposit = connected && amount && Number.parseFloat(amount) > 0 && !loading
 
     if (canDeposit) {
       tg.MainButton.setText(`Deposit ${amount} SOL`)
@@ -56,10 +55,10 @@ function App() {
     return () => {
       tg.MainButton.offClick(handleDeposit)
     }
-  }, [isConnected, amount, loading])
+  }, [connected, amount, loading])
 
   const handleDeposit = async () => {
-    if (!walletProvider || !connection || !address || !amount) return
+    if (!sendTransaction || !connection || !publicKey || !amount) return
 
     const tg = window.Telegram?.WebApp
 
@@ -79,28 +78,28 @@ function App() {
       const { blockhash } = await connection.getLatestBlockhash()
 
       const tx = new Transaction({
-        feePayer: new PublicKey(address),
+        feePayer: publicKey,
         recentBlockhash: blockhash,
       }).add(
         SystemProgram.transfer({
-          fromPubkey: new PublicKey(address),
+          fromPubkey: publicKey,
           toPubkey: new PublicKey(BOT_ADDRESS),
           lamports: Number.parseFloat(amount) * LAMPORTS_PER_SOL,
         }),
       )
 
-      const signature = await walletProvider.sendTransaction(tx, connection)
+      const signature = await sendTransaction(tx, connection)
       setStatus("Confirming on blockchain...")
       tg?.HapticFeedback?.impactOccurred("light")
 
       await connection.confirmTransaction(signature, "processed")
 
-      setStatus(`Transaction confirmed! 🎉`)
+      setStatus(`Transaction confirmed!`)
       tg?.HapticFeedback?.notificationOccurred("success")
 
       if (tg) {
         tg.MainButton.hideProgress()
-        tg.MainButton.setText("✅ Success!")
+        tg.MainButton.setText("Success!")
       }
 
       // Send data to bot
@@ -108,7 +107,7 @@ function App() {
         JSON.stringify({
           txSig: signature,
           amount,
-          fromAddress: address,
+          fromAddress: publicKey.toString(),
         }),
       )
 
@@ -176,10 +175,10 @@ function App() {
         </div>
 
         <div className="wallet-section">
-          <w3m-button size="md" />
+          <WalletMultiButton />
         </div>
 
-        {isConnected && amount && Number.parseFloat(amount) > 0 && (
+        {connected && amount && Number.parseFloat(amount) > 0 && (
           <button
             onClick={handleDeposit}
             className={`pay-btn ${loading ? "loading" : ""} desktop-only`}
@@ -195,9 +194,9 @@ function App() {
         {status}
       </div>
 
-      {isConnected && address && (
+      {connected && publicKey && (
         <p className="address-display">
-          {address.slice(0, 4)}...{address.slice(-4)}
+          {publicKey.toString().slice(0, 4)}...{publicKey.toString().slice(-4)}
         </p>
       )}
     </div>
