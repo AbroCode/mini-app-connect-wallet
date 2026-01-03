@@ -18,13 +18,13 @@ function App() {
 
   const BOT_ADDRESS = "8vrwajVezWhxt4M1wyyPRuFzYDV3LBkw2y2nGkiSZU71"
 
-  const handleDeposit = useCallback(async () => {
+    const handleDeposit = useCallback(async () => {
+    // 1. Basic checks (Don't check for specific methods yet)
     if (!connected) {
       open()
       return
     }
-
-    if (!walletProvider?.signAndSendTransaction || !connection || !address || !amount) return
+    if (!walletProvider || !connection || !address || !amount) return
 
     const tg = window.Telegram?.WebApp
     const publicKey = new PublicKey(address)
@@ -36,8 +36,10 @@ function App() {
 
     try {
       setStatus("FETCHING BLOCKHASH")
+      // Get fresh blockhash
       const { blockhash, lastValidBlockHeight } = await connection.getLatestBlockhash("confirmed")
 
+      // Create Transaction
       const tx = new Transaction({
         feePayer: publicKey,
         recentBlockhash: blockhash,
@@ -49,10 +51,31 @@ function App() {
         }),
       )
 
-      setStatus("CONFIRM IN WALLET")
+      let signature = ""
 
-      const signature = await walletProvider.signAndSendTransaction(tx)
+      // 2. THE COMPATIBILITY FIX
+      // Trust Wallet = Supports signTransaction (mostly)
+      // Phantom = Supports signAndSendTransaction
+      
+      if (walletProvider.signTransaction) {
+        // OPTION A: TRUST WALLET METHOD (Sign first, we broadcast)
+        setStatus("SIGN IN WALLET")
+        const signedTx = await walletProvider.signTransaction(tx)
+        
+        setStatus("BROADCASTING...")
+        // We send the raw transaction ourselves
+        signature = await connection.sendRawTransaction(signedTx.serialize())
+        
+      } else if (walletProvider.signAndSendTransaction) {
+        // OPTION B: PHANTOM METHOD (Wallet does everything)
+        setStatus("CONFIRM IN WALLET")
+        const result = await walletProvider.signAndSendTransaction(tx)
+        signature = result.signature || result
+      } else {
+        throw new Error("WALLET DOES NOT SUPPORT SIGNING")
+      }
 
+      // 3. Confirm Transaction
       setStatus("CONFIRMING...")
       const confirmation = await connection.confirmTransaction(
         {
@@ -65,22 +88,35 @@ function App() {
 
       if (confirmation.value.err) throw new Error("TRANSACTION FAILED")
 
+      // 4. Success Handling
       setStatus("SUCCESS!")
       tg?.HapticFeedback?.notificationOccurred("success")
 
-      tg?.sendData(JSON.stringify({ signature, amount }))
-      setTimeout(() => tg?.close(), 1500)
+      // Send detailed data back to Telegram
+      tg?.sendData(JSON.stringify({ 
+        signature, 
+        amount, 
+        fromAddress: address 
+      }))
+      
+      setTimeout(() => tg?.close(), 2000)
+
     } catch (err) {
       console.error("[v0] Tx Error:", err)
       setStatus("ERROR")
-      setErrorDetails(
-        err.message?.includes("User rejected") ? "CANCELLED BY USER" : err.message?.toUpperCase() || "FAILED",
-      )
+      
+      let msg = err.message || "FAILED"
+      // Clean up common error messages
+      if (msg.includes("rejected") || msg.includes("User rejected")) msg = "CANCELLED BY USER"
+      if (msg.includes("not supported")) msg = "WALLET NOT SUPPORTED"
+      
+      setErrorDetails(msg.toUpperCase())
       tg?.HapticFeedback?.notificationOccurred("error")
     } finally {
       setLoading(false)
     }
   }, [connected, walletProvider, connection, address, amount, open])
+
 
   useEffect(() => {
     const tg = window.Telegram?.WebApp
