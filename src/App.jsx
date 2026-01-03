@@ -1,6 +1,7 @@
 "use client"
 
 import { useEffect, useState } from "react"
+import { useAppKit } from '@reown/appkit/react' // For opening modal
 import { useAppKitAccount, useAppKitProvider } from '@reown/appkit/react'
 import { useAppKitConnection } from '@reown/appkit-adapter-solana/react'
 import { PublicKey, Transaction, SystemProgram, LAMPORTS_PER_SOL } from "@solana/web3.js"
@@ -163,14 +164,12 @@ function App() {
     window.history.replaceState({}, "", url.toString())
   }, [amount])
 
-  const handleChangeWallet = async () => {
-    try {
-      await disconnect?.()
-      window.Telegram?.WebApp?.HapticFeedback?.impactOccurred("light")
-    } catch (e) {
-      console.error("[v0] Disconnect error:", e)
-    }
-  }
+  const { open } = useAppKit() // Hook to open Reown modal
+
+const handleChangeWallet = () => {
+  open() // Opens the pro modal — shows account + disconnect/switch options
+  window.Telegram?.WebApp?.HapticFeedback?.impactOccurred("light")
+}
 
   return (
     <div className="container">
@@ -212,7 +211,7 @@ function App() {
                 {publicKey?.toString().slice(0, 4)}...{publicKey?.toString().slice(-4)}
               </div>
               <button onClick={handleChangeWallet} className="change-wallet-btn">
-                CHANGE WALLET
+                CHANGE / DISCONNECT WALLET
               </button>
             </div>
           )}
