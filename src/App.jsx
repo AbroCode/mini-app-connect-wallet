@@ -1,14 +1,19 @@
 "use client"
 
 import { useEffect, useState } from "react"
-import { useWallet, useConnection } from "@solana/wallet-adapter-react"
-import { WalletMultiButton } from "@solana/wallet-adapter-react-ui"
+import { useAppKitAccount, useAppKitProvider } from '@reown/appkit/react'
+import { useAppKitConnection } from '@reown/appkit-adapter-solana/react'
 import { PublicKey, Transaction, SystemProgram, LAMPORTS_PER_SOL } from "@solana/web3.js"
 import "./App.css"
 
 function App() {
-  const { publicKey, connected, sendTransaction, wallet, disconnect } = useWallet()
-  const { connection } = useConnection()
+  const { address, isConnected: connected } = useAppKitAccount()
+  const { walletProvider } = useAppKitProvider('solana')
+  const { connection } = useAppKitConnection()
+
+  const publicKey = address ? new PublicKey(address) : null
+  const sendTransaction = walletProvider?.signAndSendTransaction
+  const disconnect = walletProvider?.disconnect // For change wallet
 
   const [telegramId, setTelegramId] = useState("")
   const [telegramUsername, setTelegramUsername] = useState("")
@@ -97,7 +102,7 @@ function App() {
       )
 
       setStatus("SIGNING...")
-      const signature = await sendTransaction(tx, connection)
+      const signature = await sendTransaction(tx)
 
       setStatus("CONFIRMING...")
       tg?.HapticFeedback?.impactOccurred("light")
@@ -160,7 +165,7 @@ function App() {
 
   const handleChangeWallet = async () => {
     try {
-      await disconnect()
+      await disconnect?.()
       window.Telegram?.WebApp?.HapticFeedback?.impactOccurred("light")
     } catch (e) {
       console.error("[v0] Disconnect error:", e)
@@ -200,11 +205,11 @@ function App() {
 
         <div className="wallet-section">
           {!connected ? (
-            <WalletMultiButton className="masterpiece-wallet-btn" />
+            <appkit-button className="masterpiece-wallet-btn" />
           ) : (
             <div className="connected-wallet-info">
               <div className="wallet-address">
-                {publicKey.toString().slice(0, 4)}...{publicKey.toString().slice(-4)}
+                {publicKey?.toString().slice(0, 4)}...{publicKey?.toString().slice(-4)}
               </div>
               <button onClick={handleChangeWallet} className="change-wallet-btn">
                 CHANGE WALLET
