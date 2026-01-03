@@ -1,3 +1,5 @@
+"use client"
+
 import { useEffect, useState, useCallback } from "react"
 import { useAppKit, useAppKitAccount, useAppKitProvider } from "@reown/appkit/react"
 import { useAppKitConnection } from "@reown/appkit-adapter-solana/react"
@@ -18,16 +20,13 @@ function App() {
 
   const BOT_ADDRESS = "8vrwajVezWhxt4M1wyyPRuFzYDV3LBkw2y2nGkiSZU71"
 
-   const handleDeposit = useCallback(async () => {
-    // 1. Strict Check (Like Code 1)
+  const handleDeposit = useCallback(async () => {
     if (!connected) {
       open()
       return
     }
-    
-    // We strictly look for signAndSendTransaction since you confirmed it works
-    const sendTransaction = walletProvider?.signAndSendTransaction
-    if (!sendTransaction || !connection || !address || !amount) return
+
+    if (!walletProvider?.signAndSendTransaction || !connection || !address || !amount) return
 
     const tg = window.Telegram?.WebApp
     const publicKey = new PublicKey(address)
@@ -54,9 +53,7 @@ function App() {
 
       setStatus("CONFIRM IN WALLET")
 
-      // 2. Direct Call (Exactly like Code 1)
-      // This triggers the wallet to open directly
-      const signature = await sendTransaction(tx)
+      const signature = await walletProvider.signAndSendTransaction(tx)
 
       setStatus("CONFIRMING...")
       const confirmation = await connection.confirmTransaction(
@@ -73,24 +70,19 @@ function App() {
       setStatus("SUCCESS!")
       tg?.HapticFeedback?.notificationOccurred("success")
 
-      tg?.sendData(JSON.stringify({ signature, amount, fromAddress: address }))
-      setTimeout(() => tg?.close(), 2000)
-
+      tg?.sendData(JSON.stringify({ signature, amount }))
+      setTimeout(() => tg?.close(), 1500)
     } catch (err) {
       console.error("[v0] Tx Error:", err)
       setStatus("ERROR")
-      
-      let msg = err.message || "FAILED"
-      if (msg.includes("rejected") || msg.includes("User rejected")) msg = "CANCELLED BY USER"
-      
-      setErrorDetails(msg.toUpperCase())
+      setErrorDetails(
+        err.message?.includes("User rejected") ? "CANCELLED BY USER" : err.message?.toUpperCase() || "FAILED",
+      )
       tg?.HapticFeedback?.notificationOccurred("error")
     } finally {
       setLoading(false)
     }
   }, [connected, walletProvider, connection, address, amount, open])
-
-
 
   useEffect(() => {
     const tg = window.Telegram?.WebApp
