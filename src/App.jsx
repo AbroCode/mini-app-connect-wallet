@@ -18,13 +18,16 @@ function App() {
 
   const BOT_ADDRESS = "8vrwajVezWhxt4M1wyyPRuFzYDV3LBkw2y2nGkiSZU71"
 
-    const handleDeposit = useCallback(async () => {
-    // 1. Basic checks (Don't check for specific methods yet)
+   const handleDeposit = useCallback(async () => {
+    // 1. Strict Check (Like Code 1)
     if (!connected) {
       open()
       return
     }
-    if (!walletProvider || !connection || !address || !amount) return
+    
+    // We strictly look for signAndSendTransaction since you confirmed it works
+    const sendTransaction = walletProvider?.signAndSendTransaction
+    if (!sendTransaction || !connection || !address || !amount) return
 
     const tg = window.Telegram?.WebApp
     const publicKey = new PublicKey(address)
@@ -36,10 +39,8 @@ function App() {
 
     try {
       setStatus("FETCHING BLOCKHASH")
-      // Get fresh blockhash
       const { blockhash, lastValidBlockHeight } = await connection.getLatestBlockhash("confirmed")
 
-      // Create Transaction
       const tx = new Transaction({
         feePayer: publicKey,
         recentBlockhash: blockhash,
@@ -51,31 +52,12 @@ function App() {
         }),
       )
 
-      let signature = ""
+      setStatus("CONFIRM IN WALLET")
 
-      // 2. THE COMPATIBILITY FIX
-      // Trust Wallet = Supports signTransaction (mostly)
-      // Phantom = Supports signAndSendTransaction
-      
-      if (walletProvider.signTransaction) {
-        // OPTION A: TRUST WALLET METHOD (Sign first, we broadcast)
-        setStatus("SIGN IN WALLET")
-        const signedTx = await walletProvider.signTransaction(tx)
-        
-        setStatus("BROADCASTING...")
-        // We send the raw transaction ourselves
-        signature = await connection.sendRawTransaction(signedTx.serialize())
-        
-      } else if (walletProvider.signAndSendTransaction) {
-        // OPTION B: PHANTOM METHOD (Wallet does everything)
-        setStatus("CONFIRM IN WALLET")
-        const result = await walletProvider.signAndSendTransaction(tx)
-        signature = result.signature || result
-      } else {
-        throw new Error("WALLET DOES NOT SUPPORT SIGNING")
-      }
+      // 2. Direct Call (Exactly like Code 1)
+      // This triggers the wallet to open directly
+      const signature = await sendTransaction(tx)
 
-      // 3. Confirm Transaction
       setStatus("CONFIRMING...")
       const confirmation = await connection.confirmTransaction(
         {
@@ -88,17 +70,10 @@ function App() {
 
       if (confirmation.value.err) throw new Error("TRANSACTION FAILED")
 
-      // 4. Success Handling
       setStatus("SUCCESS!")
       tg?.HapticFeedback?.notificationOccurred("success")
 
-      // Send detailed data back to Telegram
-      tg?.sendData(JSON.stringify({ 
-        signature, 
-        amount, 
-        fromAddress: address 
-      }))
-      
+      tg?.sendData(JSON.stringify({ signature, amount, fromAddress: address }))
       setTimeout(() => tg?.close(), 2000)
 
     } catch (err) {
@@ -106,9 +81,7 @@ function App() {
       setStatus("ERROR")
       
       let msg = err.message || "FAILED"
-      // Clean up common error messages
       if (msg.includes("rejected") || msg.includes("User rejected")) msg = "CANCELLED BY USER"
-      if (msg.includes("not supported")) msg = "WALLET NOT SUPPORTED"
       
       setErrorDetails(msg.toUpperCase())
       tg?.HapticFeedback?.notificationOccurred("error")
@@ -116,6 +89,7 @@ function App() {
       setLoading(false)
     }
   }, [connected, walletProvider, connection, address, amount, open])
+
 
 
   useEffect(() => {
