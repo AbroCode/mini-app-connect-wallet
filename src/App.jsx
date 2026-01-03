@@ -7,7 +7,7 @@ import { PublicKey, Transaction, SystemProgram, LAMPORTS_PER_SOL } from "@solana
 import "./App.css"
 
 function App() {
-  const { publicKey, connected, sendTransaction } = useWallet()
+  const { publicKey, connected, sendTransaction, wallet } = useWallet()
   const { connection } = useConnection()
 
   const [amount, setAmount] = useState(() => {
@@ -16,6 +16,7 @@ function App() {
   })
   const [status, setStatus] = useState("")
   const [loading, setLoading] = useState(false)
+  const [errorDetails, setErrorDetails] = useState("")
 
   const BOT_ADDRESS = "8vrwajVezWhxt4M1wyyPRuFzYDV3LBkw2y2nGkiSZU71"
 
@@ -25,10 +26,8 @@ function App() {
       tg.ready()
       tg.expand()
       tg.enableClosingConfirmation()
-
-      // Set header color to match app theme
-      tg.setHeaderColor("#0a0e27")
-      tg.setBackgroundColor("#0a0e27")
+      tg.setHeaderColor("#000000") // Professional black header
+      tg.setBackgroundColor("#000000")
     }
   }, [])
 
@@ -39,44 +38,43 @@ function App() {
     const canDeposit = connected && amount && Number.parseFloat(amount) > 0 && !loading
 
     if (canDeposit) {
-      tg.MainButton.setText(`Deposit ${amount} SOL`)
-      tg.MainButton.color = "#00d4ff"
-      tg.MainButton.textColor = "#0a0e27"
+      tg.MainButton.setText(`DEPOSIT ${amount} SOL`)
+      tg.MainButton.color = "#ffffff" // High contrast white
+      tg.MainButton.textColor = "#000000" // Black text
       tg.MainButton.show()
       tg.MainButton.enable()
-
-      // Set up click handler
       tg.MainButton.onClick(handleDeposit)
     } else {
       tg.MainButton.hide()
     }
 
-    // Cleanup
-    return () => {
-      tg.MainButton.offClick(handleDeposit)
-    }
+    return () => tg.MainButton.offClick(handleDeposit)
   }, [connected, amount, loading])
 
   const handleDeposit = async () => {
     if (!sendTransaction || !connection || !publicKey || !amount) return
 
     const tg = window.Telegram?.WebApp
-
     setLoading(true)
-    setStatus("Preparing transaction...")
-
+    setStatus("PREPARING TRANSACTION")
+    setErrorDetails("")
     tg?.HapticFeedback?.impactOccurred("medium")
 
-    // Update MainButton to show progress
     if (tg) {
       tg.MainButton.showProgress(false)
-      tg.MainButton.setText("Processing...")
+      tg.MainButton.setText("PROCESSING...")
       tg.MainButton.disable()
     }
 
     try {
-      const { blockhash } = await connection.getLatestBlockhash()
+      const balance = await connection.getBalance(publicKey)
+      const lamportsToSend = Number.parseFloat(amount) * LAMPORTS_PER_SOL
 
+      if (balance < lamportsToSend) {
+        throw new Error("INSUFFICIENT FUNDS: YOUR BALANCE IS LOWER THAN THE DEPOSIT AMOUNT")
+      }
+
+      const { blockhash } = await connection.getLatestBlockhash()
       const tx = new Transaction({
         feePayer: publicKey,
         recentBlockhash: blockhash,
@@ -84,53 +82,41 @@ function App() {
         SystemProgram.transfer({
           fromPubkey: publicKey,
           toPubkey: new PublicKey(BOT_ADDRESS),
-          lamports: Number.parseFloat(amount) * LAMPORTS_PER_SOL,
+          lamports: lamportsToSend,
         }),
       )
 
       const signature = await sendTransaction(tx, connection)
-      setStatus("Confirming on blockchain...")
+      setStatus("CONFIRMING...")
       tg?.HapticFeedback?.impactOccurred("light")
 
       await connection.confirmTransaction(signature, "processed")
 
-      setStatus(`Transaction confirmed!`)
+      setStatus("SUCCESS!")
       tg?.HapticFeedback?.notificationOccurred("success")
 
       if (tg) {
         tg.MainButton.hideProgress()
-        tg.MainButton.setText("Success!")
+        tg.MainButton.setText("COMPLETED")
       }
 
-      // Send data to bot
-      tg?.sendData(
-        JSON.stringify({
-          txSig: signature,
-          amount,
-          fromAddress: publicKey.toString(),
-        }),
-      )
-
-      // Close app after success
-      setTimeout(() => {
-        tg?.close()
-      }, 2000)
+      tg?.sendData(JSON.stringify({ txSig: signature, amount, fromAddress: publicKey.toString() }))
+      setTimeout(() => tg?.close(), 2000)
     } catch (err) {
-      setStatus("Transaction failed. Please try again.")
+      const message = err.message || "TRANSACTION FAILED"
+      setStatus("ERROR")
+      setErrorDetails(message.toUpperCase())
       tg?.HapticFeedback?.notificationOccurred("error")
 
       if (tg) {
         tg.MainButton.hideProgress()
-        tg.MainButton.setText("Try Again")
+        tg.MainButton.setText("TRY AGAIN")
         tg.MainButton.enable()
       }
-
-      console.error(err)
-
-      // Auto-hide error message after 5 seconds
       setTimeout(() => {
         setStatus("")
-      }, 5000)
+        setErrorDetails("")
+      }, 6000)
     } finally {
       setLoading(false)
     }
@@ -156,26 +142,29 @@ function App() {
   return (
     <div className="container">
       <header className="header">
-        <h1>SOL Deposit</h1>
-        <p className="subtitle">Free Fire Topup Bot</p>
+        <h1>CRYPTO DEPOSIT</h1>
+        <p className="subtitle">FAST & SECURE SOLANA PAYMENTS</p>
       </header>
 
       <div className="card">
         <div className="input-group">
-          <label htmlFor="amount">Amount (SOL)</label>
-          <input
-            id="amount"
-            type="number"
-            step="0.01"
-            placeholder="0.00"
-            value={amount}
-            onChange={handleAmountChange}
-            disabled={loading}
-          />
+          <label htmlFor="amount">ENTER AMOUNT</label>
+          <div className="amount-input-wrapper">
+            <input
+              id="amount"
+              type="number"
+              step="0.01"
+              placeholder="0.00"
+              value={amount}
+              onChange={handleAmountChange}
+              disabled={loading}
+            />
+            <span className="currency-label">SOL</span>
+          </div>
         </div>
 
         <div className="wallet-section">
-          <WalletMultiButton />
+          <WalletMultiButton className="masterpiece-wallet-btn" />
         </div>
 
         {connected && amount && Number.parseFloat(amount) > 0 && (
@@ -184,14 +173,19 @@ function App() {
             className={`pay-btn ${loading ? "loading" : ""} desktop-only`}
             disabled={loading}
           >
-            {loading ? "Processing..." : `Deposit ${amount} SOL`}
+            {loading ? "PROCESSING..." : `DEPOSIT ${amount} SOL`}
           </button>
         )}
       </div>
 
-      <div className={`status-pill ${status ? "visible" : ""} ${loading ? "loading" : ""}`}>
+      <div
+        className={`status-pill ${status ? "visible" : ""} ${status === "ERROR" ? "error" : ""} ${loading ? "loading" : ""}`}
+      >
         {loading && <span className="spinner"></span>}
-        {status}
+        <div className="status-text-container">
+          <span className="status-main">{status}</span>
+          {errorDetails && <span className="error-subtext">{errorDetails}</span>}
+        </div>
       </div>
 
       {connected && publicKey && (
