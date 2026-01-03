@@ -1,95 +1,42 @@
-"use client"
-
-import { useEffect, useState } from "react"
-import { useAppKit } from '@reown/appkit/react' // For opening modal
-import { useAppKitAccount, useAppKitProvider } from '@reown/appkit/react'
-import { useAppKitConnection } from '@reown/appkit-adapter-solana/react'
+import { useEffect, useState, useCallback } from "react"
+import { useAppKit, useAppKitAccount, useAppKitProvider } from "@reown/appkit/react"
+import { useAppKitConnection } from "@reown/appkit-adapter-solana/react"
 import { PublicKey, Transaction, SystemProgram, LAMPORTS_PER_SOL } from "@solana/web3.js"
 import "./App.css"
 
 function App() {
   const { address, isConnected: connected } = useAppKitAccount()
-  const { walletProvider } = useAppKitProvider('solana')
+  const { walletProvider } = useAppKitProvider("solana")
   const { connection } = useAppKitConnection()
+  const { open } = useAppKit()
 
-  const publicKey = address ? new PublicKey(address) : null
-  const sendTransaction = walletProvider?.signAndSendTransaction
-  const disconnect = walletProvider?.disconnect // For change wallet
-
-  const [telegramId, setTelegramId] = useState("")
-  const [telegramUsername, setTelegramUsername] = useState("")
-
-  const [params] = useState(() => new URLSearchParams(window.location.search))
-  const [amount, setAmount] = useState(params.get("amount") || "")
-  const [userId, setUserId] = useState(params.get("userId") || "UNKNOWN")
-
-  const [status, setStatus] = useState("")
+  const [amount, setAmount] = useState("")
   const [loading, setLoading] = useState(false)
+  const [status, setStatus] = useState("")
   const [errorDetails, setErrorDetails] = useState("")
+  const [telegramId, setTelegramId] = useState("")
 
   const BOT_ADDRESS = "8vrwajVezWhxt4M1wyyPRuFzYDV3LBkw2y2nGkiSZU71"
 
-  useEffect(() => {
-    const tg = window.Telegram?.WebApp
-    if (tg) {
-      tg.ready()
-      tg.expand()
-      tg.enableClosingConfirmation()
-      tg.setHeaderColor("#000000") // Professional black header
-      tg.setBackgroundColor("#000000")
-
-      const user = tg.initDataUnsafe?.user
-      if (user) {
-        setTelegramId(user.id?.toString() || "")
-        setTelegramUsername(user.username || user.first_name || "")
-      }
-
-      console.log("[v0] Telegram User ID:", user?.id)
-      console.log("[v0] Telegram Username:", user?.username || user?.first_name)
-    }
-  }, [])
-
-  useEffect(() => {
-    const tg = window.Telegram?.WebApp
-    if (!tg) return
-
-    const canDeposit = connected && amount && Number.parseFloat(amount) > 0 && !loading
-
-    if (canDeposit) {
-      tg.MainButton.setText(`DEPOSIT ${amount} SOL`)
-      tg.MainButton.color = "#ffffff" // High contrast white
-      tg.MainButton.textColor = "#000000" // Black text
-      tg.MainButton.show()
-      tg.MainButton.enable()
-      tg.MainButton.onClick(handleDeposit)
-    } else {
-      tg.MainButton.hide()
+  const handleDeposit = useCallback(async () => {
+    if (!connected) {
+      open()
+      return
     }
 
-    return () => tg.MainButton.offClick(handleDeposit)
-  }, [connected, amount, loading])
-
-  const handleDeposit = async () => {
-    if (!sendTransaction || !connection || !publicKey || !amount) return
+    if (!walletProvider?.signAndSendTransaction || !connection || !address || !amount) return
 
     const tg = window.Telegram?.WebApp
+    const publicKey = new PublicKey(address)
+
     setLoading(true)
     setStatus("PREPARING")
     setErrorDetails("")
     tg?.HapticFeedback?.impactOccurred("medium")
 
     try {
-      setStatus("CHECKING BALANCE...")
-      const balance = await connection.getBalance(publicKey)
-      const lamportsToSend = Math.round(Number.parseFloat(amount) * LAMPORTS_PER_SOL)
-
-      if (balance < lamportsToSend) {
-        const balanceSOL = (balance / LAMPORTS_PER_SOL).toFixed(4)
-        throw new Error(`INSUFFICIENT FUNDS: YOU HAVE ${balanceSOL} SOL BUT NEED ${amount} SOL`)
-      }
-
-      setStatus("PREPARING TX...")
-      const { blockhash, lastValidBlockHeight } = await connection.getLatestBlockhash()
+      setStatus("FETCHING BLOCKHASH")
+      const { blockhash, lastValidBlockHeight } = await connection.getLatestBlockhash("confirmed")
 
       const tx = new Transaction({
         feePayer: publicKey,
@@ -98,16 +45,15 @@ function App() {
         SystemProgram.transfer({
           fromPubkey: publicKey,
           toPubkey: new PublicKey(BOT_ADDRESS),
-          lamports: lamportsToSend,
+          lamports: Math.round(Number.parseFloat(amount) * LAMPORTS_PER_SOL),
         }),
       )
 
-      setStatus("SIGNING...")
-      const signature = await sendTransaction(tx)
+      setStatus("CONFIRM IN WALLET")
+
+      const signature = await walletProvider.signAndSendTransaction(tx)
 
       setStatus("CONFIRMING...")
-      tg?.HapticFeedback?.impactOccurred("light")
-
       const confirmation = await connection.confirmTransaction(
         {
           signature,
@@ -117,125 +63,80 @@ function App() {
         "confirmed",
       )
 
-      if (confirmation.value.err) {
-        throw new Error("TRANSACTION FAILED ON CHAIN")
-      }
+      if (confirmation.value.err) throw new Error("TRANSACTION FAILED")
 
       setStatus("SUCCESS!")
       tg?.HapticFeedback?.notificationOccurred("success")
 
-      tg?.sendData(
-        JSON.stringify({
-          txSig: signature,
-          amount,
-          fromAddress: publicKey.toString(),
-          telegramId: telegramId || "unknown",
-        }),
-      )
-      setTimeout(() => tg?.close(), 2000)
+      tg?.sendData(JSON.stringify({ signature, amount }))
+      setTimeout(() => tg?.close(), 1500)
     } catch (err) {
-      console.log("[v0] Transaction error:", err)
-      let message = err.message || "TRANSACTION FAILED"
-      if (message.includes("403")) message = "NETWORK ERROR: RPC ACCESS FORBIDDEN. PLEASE TRY AGAIN LATER."
-      if (message.includes("User rejected")) message = "CANCELLED: YOU REJECTED THE REQUEST"
-
+      console.error("[v0] Tx Error:", err)
       setStatus("ERROR")
-      setErrorDetails(message.toUpperCase())
+      setErrorDetails(
+        err.message?.includes("User rejected") ? "CANCELLED BY USER" : err.message?.toUpperCase() || "FAILED",
+      )
       tg?.HapticFeedback?.notificationOccurred("error")
     } finally {
       setLoading(false)
     }
-  }
-
-  const handleAmountChange = (e) => {
-    setAmount(e.target.value)
-    if (e.target.value && Number.parseFloat(e.target.value) > 0) {
-      window.Telegram?.WebApp?.HapticFeedback?.selectionChanged()
-    }
-  }
+  }, [connected, walletProvider, connection, address, amount, open])
 
   useEffect(() => {
-    const url = new URL(window.location.href)
-    if (amount) {
-      url.searchParams.set("amount", amount)
-    } else {
-      url.searchParams.delete("amount")
+    const tg = window.Telegram?.WebApp
+    if (tg) {
+      tg.ready()
+      tg.MainButton.setText(`DEPOSIT ${amount || "0"} SOL`)
+      if (connected && amount > 0) {
+        tg.MainButton.show()
+        tg.MainButton.onClick(handleDeposit)
+      } else {
+        tg.MainButton.hide()
+      }
+      return () => tg.MainButton.offClick(handleDeposit)
     }
-    window.history.replaceState({}, "", url.toString())
-  }, [amount])
-
-  const { open } = useAppKit() // Hook to open Reown modal
-
-const handleChangeWallet = () => {
-  open() // Opens the pro modal — shows account + disconnect/switch options
-  window.Telegram?.WebApp?.HapticFeedback?.impactOccurred("light")
-}
+  }, [connected, amount, handleDeposit])
 
   return (
     <div className="container">
       <header className="header">
         <h1>CRYPTO DEPOSIT</h1>
-        <p className="subtitle">FAST & SECURE SOLANA PAYMENTS</p>
-        {telegramId && <p className="telegram-id-badge">ID: {telegramId}</p>}
-        {telegramUsername && (
-          <div className="telegram-user-badge">
-            <span className="user-label">USER:</span>
-            <span className="user-value">{telegramUsername || `ID: ${telegramId}`}</span>
-          </div>
-        )}
+        <p className="subtitle">PHANTOM & SOLANA READY</p>
       </header>
 
       <div className="card">
         <div className="input-group">
-          <label htmlFor="amount">ENTER AMOUNT</label>
+          <label>AMOUNT (SOL)</label>
           <div className="amount-input-wrapper">
-            <input
-              id="amount"
-              type="number"
-              step="0.01"
-              placeholder="0.00"
-              value={amount}
-              onChange={handleAmountChange}
-              disabled={loading}
-            />
-            <span className="currency-label">SOL</span>
+            <input type="number" value={amount} onChange={(e) => setAmount(e.target.value)} placeholder="0.00" />
           </div>
         </div>
 
         <div className="wallet-section">
           {!connected ? (
-            <appkit-button className="masterpiece-wallet-btn" />
+            <appkit-button />
           ) : (
-            <div className="connected-wallet-info">
-              <div className="wallet-address">
-                {publicKey?.toString().slice(0, 4)}...{publicKey?.toString().slice(-4)}
-              </div>
-              <button onClick={handleChangeWallet} className="change-wallet-btn">
-                CHANGE / DISCONNECT WALLET
+            <div className="connected-info">
+              <p>
+                CONNECTED: {address.slice(0, 4)}...{address.slice(-4)}
+              </p>
+              <button onClick={() => open()} className="pay-btn">
+                SWITCH WALLET
               </button>
             </div>
           )}
         </div>
 
-        {connected && amount && Number.parseFloat(amount) > 0 && (
-          <button
-            onClick={handleDeposit}
-            className={`pay-btn ${loading ? "loading" : ""} desktop-only`}
-            disabled={loading}
-          >
-            {loading ? "PROCESSING..." : `DEPOSIT ${amount} SOL`}
+        {connected && amount > 0 && (
+          <button onClick={handleDeposit} className="pay-btn" disabled={loading}>
+            {loading ? "CHECK WALLET..." : `PAY ${amount} SOL`}
           </button>
         )}
       </div>
 
-      <div
-        className={`status-pill ${status ? "visible" : ""} ${status === "ERROR" ? "error" : ""} ${loading ? "loading" : ""}`}
-      >
-        {loading && <span className="spinner"></span>}
-        <div className="status-text-container">
-          <span className="status-main">{status}</span>
-          {errorDetails && <span className="error-subtext">{errorDetails}</span>}
-        </div>
+      <div className={`status-pill ${status ? "visible" : ""}`}>
+        <span>{status}</span>
+        {errorDetails && <span className="error-subtext">{errorDetails}</span>}
       </div>
     </div>
   )
